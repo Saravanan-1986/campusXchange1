@@ -33,7 +33,7 @@ npm run install-all
 # 3) seed demo data (campus geo-center is set in server/src/seed/data.js)
 npm run seed
 
-# 4) run both (server :5001 + client :5173)
+# 4) run both (server :8044 + client :6390)
 npm run dev
 ```
 

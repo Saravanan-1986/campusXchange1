@@ -39,10 +39,6 @@ export default function Landing() {
 
       <section className="mx-auto max-w-6xl px-6 pt-14 text-center sm:pt-20">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-ink-muted">
-            <span className="h-2 w-2 animate-pulse rounded-full bg-success shadow-glow" />
-            Advanced DBMS showcase — five database paradigms, one product
-          </div>
           <h1 className="mx-auto max-w-3xl font-display text-4xl font-bold leading-tight tracking-tight text-ink sm:text-6xl">
             The college-exclusive way to <span className="aurora-text aurora-anim">exchange knowledge</span> & resources
           </h1>

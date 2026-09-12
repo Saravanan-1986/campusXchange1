@@ -6,9 +6,9 @@ dotenv.config();
  * Every value can be overridden in server/.env — see .env.example.
  */
 export const env = {
-  port: parseInt(process.env.PORT || '5001', 10),
+  port: parseInt(process.env.PORT || '8044', 10),
   mongoUri: process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/campusxchange',
-  clientUrl: process.env.CLIENT_URL || 'http://localhost:5173',
+  clientUrl: process.env.CLIENT_URL || 'http://localhost:6390',
   jwtSecret: process.env.JWT_SECRET || 'campusxchange-dev-secret-change-me',
   jwtExpires: process.env.JWT_EXPIRES || '7d',
   neo4j: {

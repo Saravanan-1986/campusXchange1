@@ -20,6 +20,55 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      /* Crash reporter — plain JS, runs outside React, so even if the bundle
+         fails to boot you get the real error on screen instead of a blank page. */
+      (function () {
+        var shown = false;
+        function show(title, detail) {
+          if (shown) return;
+          shown = true;
+          var d = document.createElement('div');
+          d.style.cssText = 'position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:24px;background:linear-gradient(160deg,#0B0B1E,#14142B)';
+          var box = document.createElement('div');
+          box.style.cssText = 'max-width:720px;width:100%;border-radius:20px;padding:28px;background:rgba(20,20,43,.9);border:1px solid rgba(244,63,94,.5);color:#E2E8F0;font-family:Inter,system-ui,sans-serif;box-shadow:0 16px 48px rgba(2,2,12,.6)';
+          var tag = document.createElement('div');
+          tag.textContent = 'CampusXchange failed to start';
+          tag.style.cssText = 'font-size:12px;letter-spacing:2px;text-transform:uppercase;color:#F43F5E;font-weight:700';
+          var h = document.createElement('h1');
+          h.textContent = title;
+          h.style.cssText = 'font-size:18px;margin:10px 0;font-family:"Space Grotesk",sans-serif';
+          var pre = document.createElement('pre');
+          pre.textContent = String(detail || '').slice(0, 4000);
+          pre.style.cssText = 'max-height:220px;overflow:auto;white-space:pre-wrap;font-size:11px;color:#94A3B8;background:rgba(255,255,255,.05);padding:12px;border-radius:12px';
+          var row = document.createElement('div');
+          row.style.cssText = 'display:flex;gap:10px;margin-top:16px';
+          function mkBtn(label, fn, color) {
+            var b = document.createElement('button');
+            b.textContent = label;
+            b.style.cssText = 'padding:9px 16px;border-radius:12px;border:1px solid ' + color + '66;background:' + color + '22;color:#E2E8F0;cursor:pointer;font-size:13px;font-weight:600';
+            b.onclick = fn;
+            return b;
+          }
+          row.appendChild(mkBtn('Reload', function () { location.reload(); }, '#3B82F6'));
+          row.appendChild(mkBtn('Clear cached data & reload', function () {
+            try { localStorage.clear(); sessionStorage.clear(); } catch (e) {}
+            location.reload();
+          }, '#8B5CF6'));
+          box.appendChild(tag); box.appendChild(h); box.appendChild(pre); box.appendChild(row);
+          d.appendChild(box);
+          document.body.appendChild(d);
+        }
+        window.addEventListener('error', function (e) {
+          show('Script error' + (e.filename ? ' — ' + e.filename + ':' + e.lineno : ''),
+            (e.error && e.error.stack) || e.message || 'Unknown error');
+        });
+        window.addEventListener('unhandledrejection', function (e) {
+          var r = e.reason;
+          show('Unhandled promise rejection', (r && (r.stack || r.message)) || String(r));
+        });
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

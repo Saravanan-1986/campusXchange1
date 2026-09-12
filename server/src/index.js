@@ -62,6 +62,16 @@ app.use(errorHandler);
 const server = http.createServer(app);
 initSockets(server);
 
+// Friendly failure when the port is already taken (no scary stack dump).
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`[api] Port ${env.port} is already in use — another CampusXchange process is running.`);
+    console.error('[api] Fix:  netstat -ano | findstr :8044  → then  Stop-Process -Id <PID> -Force  → rerun.');
+    process.exit(1);
+  }
+  throw err;
+});
+
 server.listen(env.port, async () => {
   console.log(`[api] CampusXchange API listening on http://localhost:${env.port}`);
   await connectDatabase();

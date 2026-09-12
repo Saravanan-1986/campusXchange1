@@ -1,7 +1,7 @@
 import { io } from 'socket.io-client';
 import { useAuth } from '../store/auth.js';
 import { useUI } from '../store/ui.js';
-import { queryClient } from '../main.jsx';
+import { queryClient } from '../api/queryClient.js';
 
 /**
  * Socket.io singleton — realtime channel of the ACTIVE DB layer:

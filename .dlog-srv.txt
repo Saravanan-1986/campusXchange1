@@ -1,0 +1,6 @@
+[sockets] Socket.io ready
+[api] CampusXchange API listening on http://localhost:8044
+[db] MongoDB connected → campusxchange
+[active] Change Streams watching resources + transactions
+[active] node-cron jobs scheduled (overdue check every min, heartbeat every 10 min)
+[active] Polling fallback active (30s)
