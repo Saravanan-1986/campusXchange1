@@ -1,0 +1,136 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   CampusXchange runtime theme variables (rgb triplets).
+   This + src/theme/theme.js are the single source of truth.
+   ============================================================ */
+:root {
+  --bg-1-rgb: 11 11 30;            /* #0B0B1E deep space navy */
+  --bg-2-rgb: 20 20 43;            /* #14142B */
+  --bg-3-rgb: 30 30 61;            /* #1E1E3D card base */
+  --primary-rgb: 59 130 246;       /* #3B82F6 electric blue */
+  --primary-light-rgb: 96 165 250; /* #60A5FA */
+  --violet-rgb: 139 92 246;        /* #8B5CF6 */
+  --violet-light-rgb: 168 85 247;  /* #A855F7 */
+  --magenta-rgb: 217 70 239;       /* #D946EF aurora tip */
+  --cyan-rgb: 34 211 238;          /* #22D3EE success */
+  --amber-rgb: 245 158 11;         /* #F59E0B warning */
+  --rose-rgb: 244 63 94;           /* #F43F5E danger */
+  --text-rgb: 226 232 240;         /* slate-200 */
+  --muted-rgb: 148 163 184;        /* slate-400 */
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  @apply font-body text-ink antialiased;
+  color: rgb(var(--text-rgb));
+  background:
+    radial-gradient(1200px 700px at 80% -10%, rgba(139, 92, 246, 0.14), transparent 60%),
+    radial-gradient(1000px 600px at -10% 20%, rgba(59, 130, 246, 0.12), transparent 55%),
+    linear-gradient(160deg, rgb(var(--bg-1-rgb)) 0%, rgb(var(--bg-2-rgb)) 100%);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+
+/* ---------- Glass primitives ---------- */
+.glass {
+  background: rgba(20, 20, 43, 0.55);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 8px 32px rgba(2, 2, 12, 0.45);
+}
+.glass-strong {
+  background: rgba(17, 17, 38, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.glass-hover {
+  transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.glass-hover:hover {
+  transform: translateY(-3px);
+  border-color: rgba(139, 92, 246, 0.45);
+  box-shadow: 0 12px 40px rgba(2, 2, 12, 0.6), 0 0 24px rgba(139, 92, 246, 0.18);
+}
+
+/* ---------- Aurora gradient helpers ---------- */
+.aurora-text {
+  background: linear-gradient(120deg, #60A5FA 0%, #A855F7 55%, #D946EF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.aurora-anim {
+  background-size: 200% 200%;
+  animation: aurora 6s ease infinite;
+}
+/* Gradient border on CTAs: transparent border + padding/border-box double clip */
+.aurora-border {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(rgb(var(--bg-2-rgb)), rgb(var(--bg-2-rgb))) padding-box,
+    linear-gradient(120deg, #3B82F6, #8B5CF6, #D946EF) border-box;
+}
+
+/* ---------- Skeleton shimmer ---------- */
+.skeleton {
+  @apply rounded-lg bg-white/5;
+  background-image: linear-gradient(90deg, rgba(255,255,255,0) 0, rgba(255,255,255,0.06) 40px, rgba(255,255,255,0) 80px);
+  background-size: 500px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 9px; height: 9px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(139, 92, 246, 0.35); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(139, 92, 246, 0.6); }
+
+/* ---------- Leaflet dark/glass overrides ---------- */
+.leaflet-container {
+  background: rgb(var(--bg-1-rgb));
+  font-family: 'Inter', sans-serif;
+}
+.leaflet-popup-content-wrapper, .leaflet-popup-tip {
+  background: rgba(17, 17, 38, 0.92);
+  backdrop-filter: blur(12px);
+  color: rgb(var(--text-rgb));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 32px rgba(2, 2, 12, 0.55);
+}
+.leaflet-control-zoom a {
+  background: rgba(17, 17, 38, 0.85) !important;
+  color: rgb(var(--text-rgb)) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+.leaflet-control-attribution {
+  background: rgba(17, 17, 38, 0.7) !important;
+  color: rgb(var(--muted-rgb)) !important;
+}
+.leaflet-control-attribution a { color: rgb(var(--primary-light-rgb)) !important; }
+
+/* Glass map marker (divIcon) */
+.cx-marker {
+  position: relative;
+  width: 18px; height: 18px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #3B82F6, #8B5CF6);
+  box-shadow: 0 0 14px rgba(99, 102, 241, 0.9);
+  border: 2px solid rgba(255, 255, 255, 0.75);
+}
+.cx-marker::after {
+  content: '';
+  position: absolute; inset: -7px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(139, 92, 246, 0.55);
+  animation: cxPing 1.8s ease-out infinite;
+}
+@keyframes cxPing {
+  0% { transform: scale(0.55); opacity: 0.9; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
