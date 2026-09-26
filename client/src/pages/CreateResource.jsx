@@ -10,16 +10,9 @@ const CATEGORIES = ['textbook', 'calculator', 'lab-kit', 'tool', 'electronic-com
 const CONDITIONS = ['new', 'like-new', 'good', 'fair'];
 const LISTING_TYPES = ['sell', 'donate', 'exchange', 'lend'];
 
-// Campus presets — pick one and the item is geo-tagged in Postgres at creation.
-// (Custom pins via the browser still work; presets guarantee Near Me always finds items.)
-const CAMPUS_SPOTS = [
-  { name: 'Main Library', lat: 12.9716, lon: 77.5946 },
-  { name: 'CSE Block', lat: 12.9732, lon: 77.5962 },
-  { name: 'Boys Hostel', lat: 12.9698, lon: 77.5929 },
-  { name: 'Girls Hostel', lat: 12.9745, lon: 77.5918 },
-  { name: 'Sports Complex', lat: 12.9689, lon: 77.5971 },
-  { name: 'Cafeteria', lat: 12.9724, lon: 77.5935 },
-];
+// Campus pickup: no hardcoded spots. Sellers pin their real location at
+// listing time (GPS + custom label); the server geo-tags it in Postgres
+// and snaps it to the nearest campus zone via a spatial trigger.
 
 /** List a resource — location is captured at listing time (Postgres geo_resource), history + graph written on save. */
 export default function CreateResource() {
@@ -28,9 +21,12 @@ export default function CreateResource() {
     semester: 5, condition: 'good', listingType: 'sell', price: 0, tags: '',
   });
   const [files, setFiles] = useState([]);
-  const [spot, setSpot] = useState(CAMPUS_SPOTS[0].name);
+  // Pickup spot: the seller pins their real location at listing time. The
+  // server snaps it to the nearest campus zone (Postgres spatial trigger),
+  // so Nearby items ranks it by true distance with zero hardcoded places.
+  const [spot, setSpot] = useState('__gps');
   const [customLabel, setCustomLabel] = useState('');
-  const [pin, setPin] = useState({ coordinates: [CAMPUS_SPOTS[0].lon, CAMPUS_SPOTS[0].lat], label: CAMPUS_SPOTS[0].name });
+  const [pin, setPin] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -39,13 +35,12 @@ export default function CreateResource() {
 
   const pickSpot = (name) => {
     setSpot(name);
-    const s = CAMPUS_SPOTS.find((c) => c.name === name);
-    if (s) setPin({ coordinates: [s.lon, s.lat], label: customLabel || s.name });
+    if (name !== '__gps' && pin) setPin({ ...pin, label: customLabel || pin.label });
   };
 
   const captureLocation = () => {
     if (!navigator.geolocation) {
-      pushToast({ title: 'Geolocation unavailable', message: 'Pick a campus spot instead — still geo-tagged.', variant: 'warning' });
+      pushToast({ title: 'Geolocation unavailable', message: 'Enable location access to pin your pickup spot.', variant: 'warning' });
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -54,13 +49,17 @@ export default function CreateResource() {
         setSpot('__gps');
         pushToast({ title: 'Location pinned ⌖', message: 'Coordinates captured — Near Me will rank this by Postgres distance.', variant: 'success' });
       },
-      () => pushToast({ title: 'Location denied', message: 'Kept your campus-spot pin instead.', variant: 'warning' }),
+      () => pushToast({ title: 'Location needed', message: 'Could not capture your spot — allow location access and try again.', variant: 'warning' }),
       { timeout: 8000 }
     );
   };
 
   const submit = async (e) => {
     e.preventDefault();
+    if (!pin || !Array.isArray(pin.coordinates)) {
+      setError('Pin your pickup location first — tap “⌖ Pin my exact spot” so Nearby items can rank this listing.');
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -114,21 +113,19 @@ export default function CreateResource() {
               />
             </div>
             <div className="violet-panel rounded-xl p-3">
-              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted">Pickup location (saved with listing)</span>
-              <div className="grid grid-cols-2 gap-2">
-                <Select label="" value={spot} onChange={(e) => pickSpot(e.target.value)}>
-                  {CAMPUS_SPOTS.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-                  {spot === '__gps' && <option value="__gps">📌 GPS pin</option>}
-                </Select>
-                <Input placeholder="Label e.g. Room 214" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} />
-              </div>
-              <div className="mt-2 flex items-center gap-2">
+              <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted">Pickup location (saved with listing) *</span>
+              <Input placeholder="Label e.g. Library entrance / Hostel B Room 214" value={customLabel} onChange={(e) => setCustomLabel(e.target.value)} />
+              <div className="mt-2 flex flex-wrap items-center gap-2">
                 <GradientButton type="button" variant="outline" size="sm" onClick={captureLocation}>
                   ⌖ Pin my exact spot
                 </GradientButton>
-                <Badge tone="success">⌖ {Number(pin.coordinates[0]).toFixed(4)}, {Number(pin.coordinates[1]).toFixed(4)}</Badge>
+                {pin ? (
+                  <Badge tone="success">⌖ {Number(pin.coordinates[0]).toFixed(4)}, {Number(pin.coordinates[1]).toFixed(4)}</Badge>
+                ) : (
+                  <Badge tone="warning">No pin yet — tap “Pin my exact spot”</Badge>
+                )}
               </div>
-              <p className="mt-1.5 text-[11px] text-ink-muted">Stored in Postgres <code>geo_resource</code> — Nearby items ranks by distance from this point.</p>
+              <p className="mt-1.5 text-[11px] text-ink-muted">Your real GPS point is stored in Postgres <code>geo_resource</code> — Nearby items ranks by distance from this point.</p>
             </div>
           </div>
           {error && <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}

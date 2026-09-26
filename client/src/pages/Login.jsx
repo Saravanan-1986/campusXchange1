@@ -63,7 +63,7 @@ export default function Login() {
           New here? <Link to="/register" className="text-primary-light hover:underline">Create an account</Link>
         </p>
         <p className="mt-2 rounded-lg bg-white/5 px-3 py-2 text-center text-[11px] text-ink-muted">
-          Demo: <code className="text-primary-light">aisha@campusxchange.edu</code> · <code className="text-primary-light">admin@campusxchange.edu</code> · Passw0rd!
+          Use your college email to sign in — new accounts verify via the emailed link.
         </p>
       </div>
     </div>

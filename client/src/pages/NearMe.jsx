@@ -10,17 +10,16 @@ import { useUI } from '../store/ui.js';
 
 /**
  * NEAR ME — Postgres spatial list view (no map).
- * Center = your current location (or campus fallback). Radius search runs in
+ * Center = your current location. Radius search runs in
  * Postgres (PostGIS / earthdistance / haversine) over geo_resource, then items
  * are listed as cards with distance badges. Every listing gets its coordinates
- * at creation time (pin-my-location + campus presets), so this list just works.
+ * at creation time, so this list just works.
  */
-const DEMO = { lat: 12.9716, lon: 77.5946 }; // seeder campus center (Bengaluru)
-
 export default function NearMe() {
   const [center, setCenter] = useState(null); // [lat, lon]
   const [label, setLabel] = useState('');
   const [radius, setRadius] = useState(5);
+  const [centerError, setCenterError] = useState('');
   const pushToast = useUI((s) => s.pushToast);
 
   useEffect(() => {
@@ -38,20 +37,22 @@ export default function NearMe() {
 
   function locate(silent = false) {
     if (!navigator.geolocation) {
-      setCenter([DEMO.lat, DEMO.lon]);
-      setLabel('Campus center');
+      const message = 'Geolocation is unavailable in this browser — enable location access to see nearby items.';
+      setCenterError(message);
+      if (!silent) pushToast({ title: 'Location unavailable', message, variant: 'warning' });
       return;
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCenter([pos.coords.latitude, pos.coords.longitude]);
         setLabel('Your location');
+        setCenterError('');
         if (!silent) pushToast({ title: 'Centered on you ⌖', message: 'Postgres radius query executed over geo_resource.', variant: 'success' });
       },
       () => {
-        setCenter([DEMO.lat, DEMO.lon]);
-        setLabel('Campus center (demo)');
-        if (!silent) pushToast({ title: 'Using campus center', message: 'Permission denied — showing items around the seeded campus zone.', variant: 'warning' });
+        const message = 'Location permission denied — allow location access to load items near you.';
+        setCenterError(message);
+        if (!silent) pushToast({ title: 'Location needed', message, variant: 'warning' });
       },
       { timeout: 8000 }
     );
@@ -74,9 +75,6 @@ export default function NearMe() {
 
       <GlassCard hover={false} className="violet-panel mb-5 flex flex-wrap items-center gap-4 p-4">
         <GradientButton size="sm" onClick={() => locate()}>⌖ Use my location</GradientButton>
-        <GradientButton size="sm" variant="outline" onClick={() => { setCenter([DEMO.lat, DEMO.lon]); setLabel('Campus center (demo)'); }}>
-          Campus center
-        </GradientButton>
         <label className="flex items-center gap-2 text-xs text-ink-muted">
           Radius
           <input type="range" min="1" max="25" value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="w-32 accent-[#A855F7]" />
@@ -93,7 +91,14 @@ export default function NearMe() {
       {isLoading && <div className="grid h-60 place-items-center"><Spinner className="h-8 w-8" /></div>}
       {error && <EmptyState icon="⚠" title="Spatial query failed" message={errMsg(error)} />}
 
-      {!isLoading && !error && !(data?.resources?.length) && (
+      {!center && !isLoading && !error && (
+        <EmptyState
+          icon="⌖"
+          title="Location needed"
+          message={centerError || 'Allow location access to load items near you.'}
+        />
+      )}
+      {center && !isLoading && !error && !(data?.resources?.length) && (
         <EmptyState
           icon="⌖"
           title="Nothing nearby yet"

@@ -29,25 +29,17 @@ npm run install-all
 # 2) configure databases (defaults in server/.env)
 #    - MongoDB: mongodb://127.0.0.1:27017/campusxchange
 #    - Neo4j:   bolt://localhost:7687 (optional — recommendations gracefully fall back to Mongo)
+#    - ADMIN_EMAIL: the college email that gets the admin role at registration
 
-# 3) seed demo data (campus geo-center is set in server/src/seed/data.js)
-npm run seed
-
-# 4) run both (server :8044 + client :6390)
+# 3) run both (server :8044 + client :6390)
 npm run dev
 ```
 
-**Demo logins** (after seeding) — password `Passw0rd!`:
-
-| Role | Email |
-|---|---|
-| admin | `admin@campusxchange.edu` |
-| student | `aisha@campusxchange.edu` |
-| student | `rohan@campusxchange.edu` |
-| student | `meera@campusxchange.edu` |
-
-> Email verification: the dev "mailer" prints the verification link to the server
-> console, and the register response includes a `devToken` shortcut.
+> Accounts are created through the app: register with your college email and
+> verify via the emailed link (the dev "mailer" prints the verification link to
+> the server console, and the register response includes a `devToken` shortcut).
+> The admin account is bootstrapped from the `ADMIN_EMAIL` env var — no seed
+> data is required.
 > Change Streams require a MongoDB **replica set**; on a standalone `mongod` the
 > Active layer automatically switches to a 30s polling fallback and the monitor
 > shows `activeChangeStreams: polling-fallback`.
@@ -55,9 +47,9 @@ npm run dev
 ## Viva demo script (5 minutes)
 
 1. **MongoDB** — Browse the Marketplace, filter by price/condition/availability.
-2. **Temporal** — Open *Operating Systems — Galvin* → **History Timeline** tab: v1 listed ₹350 → v2 price ₹300 (validFrom/validTo intervals).
+2. **Temporal** — Open any listing → **History Timeline** tab: each edit closes the previous version (validTo) and opens a new one (validFrom/validTo intervals).
 3. **Graph** — Same resource → **Related Graph** tab: Neo4j neighborhood (Student/Subject/Department nodes). Then *Deal* with another student → `USED` edges grow the collaborative graph.
-4. **Active** — From another account, click **👀 Alert me when available** on an unavailable listing. Owner marks it available → ECA rule fires → live toast + notification. Overdue lend from the seed gets flagged by cron within a minute.
+4. **Active** — From another account, click **👀 Alert me when available** on an unavailable listing. Owner marks it available → ECA rule fires → live toast + notification. A lend past its due date gets flagged by cron within a minute.
 5. **Spatial** — **Near Me** page: radius slider runs `$geoWithin` on the 2dsphere index.
 6. **Admin** — `/admin` → **DB Monitor**: live event feed from all five paradigms (Socket.io `db:event`).
 
@@ -82,5 +74,5 @@ violet duotone with an aurora gradient, cyan/amber/rose accents. Palette lives i
     ├── src/services/  # history (temporal), graph (+queries), active/{engine,changeStreams,cron},
     │                  # notification, eventlog
     ├── src/sockets/   # Socket.io (user rooms + admin db:event feed)
-    └── src/seed/      # demo data seeder
+    └── src/db/        # SQL migrations + smoke test
 ```
