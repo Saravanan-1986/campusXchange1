@@ -36,7 +36,7 @@ export async function verifyNeo4j() {
 
 export function neo4jStatus() { return connected ? 'connected' : 'unavailable'; }
 
-async function run(cypher, params = {}) {
+export async function run(cypher, params = {}) {
   const session = getDriver().session();
   try {
     const res = await session.run(cypher, params);
@@ -49,6 +49,7 @@ async function run(cypher, params = {}) {
     await session.close();
   }
 }
+
 
 /** Upsert a Resource + its Student owner + Subject + Department subgraph. */
 export async function syncResourceToGraph(resource, ownerName = '') {

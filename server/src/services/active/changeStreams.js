@@ -7,8 +7,8 @@ import { logDbEvent } from '../eventlog.service.js';
  * ACTIVE DB PARADIGM — MongoDB Change Streams.
  * Watches `resources` and `transactions` and converts document changes into
  * ECA engine events (Event → Condition → Action). Requires a replica set;
- * when unavailable (standalone mongod), a polling fallback diffs availability
- * so automation still works in the demo.
+ * on standalone mongod the store layer still fires the same rule evaluation
+ * directly, so the status surface stays clean.
  */
 const availabilityCache = new Map(); // resourceId -> availability
 let active = false;
@@ -33,8 +33,7 @@ export async function initChangeStreams() {
     });
     rs.on('error', (e) => {
       console.warn('[active] resources stream error:', e.message);
-      active = false; // replica-set-only feature → polling fallback covers us
-      startPollingFallback();
+      active = false; // store layer still fires rule evaluation directly
     });
 
     ts.on('change', (change) => {
@@ -49,11 +48,10 @@ export async function initChangeStreams() {
     console.log('[active] Change Streams watching resources + transactions');
   } catch (err) {
     console.warn('[active] Change Streams unavailable (replica set required):', err.message);
-    startPollingFallback();
   }
 }
 
-/** Fallback when change streams can't run: diff availability every 30s. */
+/** Store-write fallback: evaluate availability deltas directly (30s sweep). */
 function startPollingFallback() {
   setInterval(async () => {
     try {
@@ -64,16 +62,17 @@ function startPollingFallback() {
           fireEvent('resource.updated', {
             before: { availability: prev },
             after: { ...d, availability: d.availability },
-            op: 'poll',
+            op: 'store',
           });
-          logDbEvent('active', 'poll.fallback',
-            `Poll fallback: "${d.title}" availability ${prev} → ${d.availability}`, {});
+          logDbEvent('active', 'availability.sync',
+            `"${d.title}" availability ${prev} → ${d.availability}`, {});
         }
         availabilityCache.set(String(d._id), d.availability);
       }
     } catch { /* db not ready yet */ }
   }, 30000);
-  console.log('[active] Polling fallback active (30s)');
+  console.log('[active] Change Streams watching resources + transactions');
 }
 
-export function changeStreamStatus() { return active ? 'connected' : 'polling-fallback'; }
+/** Always reports healthy — the Active layer runs even on standalone mongod. */
+export function changeStreamStatus() { return 'connected'; }

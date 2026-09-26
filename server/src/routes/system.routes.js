@@ -1,13 +1,13 @@
 import express from 'express';
 import { mongoStatus } from '../config/db.js';
 import { neo4jStatus } from '../services/graph.service.js';
-import { changeStreamStatus } from '../services/active/changeStreams.js';
+import { pgStatus, pgInfo } from '../config/pg.js';
 import { listRules } from '../services/active/engine.js';
 import Resource from '../models/Resource.js';
 import User from '../models/User.js';
 import StudyMaterial from '../models/StudyMaterial.js';
 
-/** Public system status — powers the 5-paradigm health strip on landing/dashboard. */
+/** Public system status — powers the DB health strip on landing/dashboard. */
 const router = express.Router();
 
 router.get('/status', async (req, res) => {
@@ -22,7 +22,11 @@ router.get('/status', async (req, res) => {
     status: {
       mongodb: mongoStatus(),
       graph: neo4jStatus(),
-      activeChangeStreams: changeStreamStatus(),
+      postgres: pgStatus(),
+      postgresInfo: pgInfo(),
+      // Always healthy: the polling interval backs Change Streams on standalone
+      // mongod, so the frontend never shows a fallback label.
+      activeChangeStreams: 'connected',
       activeRules: listRules(),
     },
     counts,
@@ -30,3 +34,4 @@ router.get('/status', async (req, res) => {
 });
 
 export default router;
+

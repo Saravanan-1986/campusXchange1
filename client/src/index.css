@@ -7,19 +7,19 @@
    This + src/theme/theme.js are the single source of truth.
    ============================================================ */
 :root {
-  --bg-1-rgb: 11 11 30;            /* #0B0B1E deep space navy */
-  --bg-2-rgb: 20 20 43;            /* #14142B */
-  --bg-3-rgb: 30 30 61;            /* #1E1E3D card base */
-  --primary-rgb: 59 130 246;       /* #3B82F6 electric blue */
-  --primary-light-rgb: 96 165 250; /* #60A5FA */
-  --violet-rgb: 139 92 246;        /* #8B5CF6 */
-  --violet-light-rgb: 168 85 247;  /* #A855F7 */
-  --magenta-rgb: 217 70 239;       /* #D946EF aurora tip */
-  --cyan-rgb: 34 211 238;          /* #22D3EE success */
-  --amber-rgb: 245 158 11;         /* #F59E0B warning */
-  --rose-rgb: 244 63 94;           /* #F43F5E danger */
-  --text-rgb: 226 232 240;         /* slate-200 */
-  --muted-rgb: 148 163 184;        /* slate-400 */
+  --bg-1-rgb: 12 8 28;              /* deep violet-black */
+  --bg-2-rgb: 24 14 52;             /* violet plum */
+  --bg-3-rgb: 34 22 68;             /* glass card base */
+  --primary-rgb: 139 92 246;        /* violet */
+  --primary-light-rgb: 196 181 253; /* light violet */
+  --violet-rgb: 139 92 246;         /* violet core */
+  --violet-light-rgb: 168 85 247;   /* neon purple */
+  --magenta-rgb: 217 70 239;        /* aurora tip */
+  --cyan-rgb: 34 211 238;
+  --amber-rgb: 245 158 11;
+  --rose-rgb: 244 63 94;
+  --text-rgb: 237 233 254;          /* lavender-white */
+  --muted-rgb: 167 151 215;         /* muted violet-grey */
 }
 
 html { scroll-behavior: smooth; }
@@ -28,26 +28,42 @@ body {
   @apply font-body text-ink antialiased;
   color: rgb(var(--text-rgb));
   background:
-    radial-gradient(1200px 700px at 80% -10%, rgba(139, 92, 246, 0.14), transparent 60%),
-    radial-gradient(1000px 600px at -10% 20%, rgba(59, 130, 246, 0.12), transparent 55%),
+    radial-gradient(1100px 620px at 85% -10%, rgba(168, 85, 247, 0.22), transparent 60%),
+    radial-gradient(900px 600px at -10% 15%, rgba(139, 92, 246, 0.20), transparent 55%),
+    radial-gradient(700px 500px at 50% 110%, rgba(217, 70, 239, 0.12), transparent 60%),
     linear-gradient(160deg, rgb(var(--bg-1-rgb)) 0%, rgb(var(--bg-2-rgb)) 100%);
   background-attachment: fixed;
   min-height: 100vh;
 }
 
+/* ---------- Violet futuristic glass ---------- */
+.violet-panel {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.14), rgba(217, 70, 239, 0.06) 55%, rgba(20, 10, 45, 0.55));
+  border: 1px solid rgba(168, 85, 247, 0.28);
+  box-shadow: 0 8px 32px rgba(88, 28, 135, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+.violet-text {
+  background: linear-gradient(120deg, #DDD6FE 0%, #A855F7 55%, #F0ABFC 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
 /* ---------- Glass primitives ---------- */
 .glass {
-  background: rgba(20, 20, 43, 0.55);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  box-shadow: 0 8px 32px rgba(2, 2, 12, 0.45);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(24, 14, 52, 0.62));
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid rgba(168, 85, 247, 0.22);
+  box-shadow: 0 8px 32px rgba(2, 2, 12, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .glass-strong {
-  background: rgba(17, 17, 38, 0.82);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: linear-gradient(135deg, rgba(88, 40, 180, 0.28), rgba(17, 10, 38, 0.88));
+  backdrop-filter: blur(24px) saturate(1.4);
+  -webkit-backdrop-filter: blur(24px) saturate(1.4);
+  border: 1px solid rgba(168, 85, 247, 0.32);
 }
 .glass-hover {
   transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
@@ -60,7 +76,7 @@ body {
 
 /* ---------- Aurora gradient helpers ---------- */
 .aurora-text {
-  background: linear-gradient(120deg, #60A5FA 0%, #A855F7 55%, #D946EF 100%);
+  background: linear-gradient(120deg, #DDD6FE 0%, #A855F7 55%, #F0ABFC 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -73,8 +89,8 @@ body {
 .aurora-border {
   border: 1px solid transparent;
   background:
-    linear-gradient(rgb(var(--bg-2-rgb)), rgb(var(--bg-2-rgb))) padding-box,
-    linear-gradient(120deg, #3B82F6, #8B5CF6, #D946EF) border-box;
+    linear-gradient(rgb(30 18 60), rgb(30 18 60)) padding-box,
+    linear-gradient(120deg, #8B5CF6, #A855F7, #F0ABFC) border-box;
 }
 
 /* ---------- Skeleton shimmer ---------- */

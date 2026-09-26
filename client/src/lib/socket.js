@@ -31,6 +31,20 @@ export function connectSocket() {
     useUI.getState().pushDbEvent(ev);
   });
 
+  // CHAT: a new bubble arrived in one of my threads → badge + thread list refresh.
+  socket.on('message:new', (m) => {
+    useUI.getState().bumpChatUnread(1);
+    queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    if (window.location.pathname !== '/chat') {
+      useUI.getState().pushToast({
+        title: `💬 ${m.peerName || 'New message'}`,
+        message: m.resourceTitle ? `${m.resourceTitle}: ${m.body}` : m.body,
+        variant: 'info',
+        link: `/chat?c=${m.conversationId}`,
+      });
+    }
+  });
+
   return socket;
 }
 

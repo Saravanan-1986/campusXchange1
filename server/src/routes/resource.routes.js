@@ -4,11 +4,13 @@ import { requireAuth } from '../middleware/auth.js';
 import { upload } from '../middleware/upload.js';
 import { recordResourceState, getResourceTimeline } from '../services/history.service.js';
 import { syncResourceToGraph, removeResourceFromGraph } from '../services/graph.service.js';
+import { syncResourceToPostgres, deleteResourceFromPostgres } from '../services/pg/sync.service.js';
 import { logDbEvent } from '../services/eventlog.service.js';
 
 /**
  * Physical Resource Marketplace.
- * SPATIAL: `near` filter uses MongoDB $near on the 2dsphere index.
+ * SPATIAL: `near` filter runs Postgres `cx_nearby_resources` over geo_resource
+ * (coordinates saved at listing time) and maps the hit list back to Mongo docs.
  * TEMPORAL: every mutation records a ResourceHistory snapshot.
  * GRAPH: every write syncs the resource subgraph to Neo4j.
  */
@@ -17,10 +19,15 @@ const router = express.Router();
 const ALLOWED = ['title', 'description', 'category', 'subject', 'department', 'semester', 'condition', 'listingType', 'price', 'tags'];
 
 function parseLocation(body) {
-  const loc = body.location;
+  let loc = body.location;
+  // Create forms send location as a JSON string (multipart); updates send an object.
+  if (typeof loc === 'string') {
+    try { loc = JSON.parse(loc); } catch { return null; }
+  }
   if (!loc || !Array.isArray(loc.coordinates)) return null;
   const [lng, lat] = loc.coordinates;
   if (!Number.isFinite(Number(lng)) || !Number.isFinite(Number(lat))) return null;
+  if (Number(lat) === 0 && Number(lng) === 0) return null; // never store null-island
   return { type: 'Point', coordinates: [Number(lng), Number(lat)], label: loc.label || '' };
 }
 
@@ -37,17 +44,32 @@ router.get('/', async (req, res, next) => {
     if (department) filter.department = department;
     if (semester) filter.semester = Number(semester);
     if (minPrice || maxPrice) filter.price = { ...(minPrice ? { $gte: Number(minPrice) } : {}), ...(maxPrice ? { $lte: Number(maxPrice) } : {}) };
-    // SPATIAL paradigm: /api/resources?near=lng,lat&radius=5 (km)
+    // SPATIAL: run Postgres geo_resource radius search first (the indexed
+    // coordinate store), then hydrate Mongo docs in distance order.
+    let pgDistanceKm = null;
     if (near) {
-      const [lng, lat] = near.split(',').map(Number);
-      if (Number.isFinite(lng) && Number.isFinite(lat)) {
-        filter.location = {
-          $near: {
-            $geometry: { type: 'Point', coordinates: [lng, lat] },
-            $maxDistance: (Number(radius) || 10) * 1000,
-          },
-        };
-        await logDbEvent('spatial', 'query.$near', `$near query within ${radius || 10}km of [${lng},${lat}]`, {});
+      try {
+        const { nearbyResources } = await import('../services/pg/spatial.service.js');
+        const [lng, lat] = near.split(',').map(Number);
+        if (Number.isFinite(lng) && Number.isFinite(lat)) {
+          const rows = await nearbyResources(lat, lng, Number(radius) || 10, { onlyAvailable: false, limit: 250 });
+          pgDistanceKm = new Map(rows.map((r) => [String(r.resource_id), Number(r.distance_m) / 1000]));
+          filter._id = { $in: [...pgDistanceKm.keys()] };
+          await logDbEvent('spatial', 'query.postgres-geo',
+            `Postgres geo_resource radius ${radius || 10}km @ [${lng},${lat}] → ${rows.length} hit(s)`, {});
+        }
+      } catch { /* PG down → fall back to Mongo $near below */ }
+      if (!pgDistanceKm) {
+        const [lng, lat] = near.split(',').map(Number);
+        if (Number.isFinite(lng) && Number.isFinite(lat)) {
+          filter.location = {
+            $near: {
+              $geometry: { type: 'Point', coordinates: [lng, lat] },
+              $maxDistance: (Number(radius) || 10) * 1000,
+            },
+          };
+          await logDbEvent('spatial', 'query.$near', `$near query within ${radius || 10}km of [${lng},${lat}]`, {});
+        }
       }
     }
     const sortMap = {
@@ -81,7 +103,9 @@ router.post('/', requireAuth, upload.array('images', 4), async (req, res, next) 
     const resource = await Resource.create(data);
     await recordResourceState(resource, { actorLabel: req.user.name, source: 'user', summary: 'Listed on marketplace' });
     await syncResourceToGraph(resource, req.user.name);
+    await syncResourceToPostgres(resource, { actorLabel: req.user.name, reason: 'Listed on marketplace' });
     res.status(201).json({ resource });
+
   } catch (err) { next(err); }
 });
 
@@ -127,8 +151,13 @@ router.patch('/:id', requireAuth, async (req, res, next) => {
         actorLabel: req.user.name, source: 'user', fields: changed,
       });
       await syncResourceToGraph(resource, resource.ownerId.name);
+      await syncResourceToPostgres(resource, {
+        actorLabel: req.user.name,
+        reason: `Updated fields: ${changed.join(', ')}`,
+      });
     }
     res.json({ resource });
+
   } catch (err) { next(err); }
 });
 
@@ -142,7 +171,12 @@ router.delete('/:id', requireAuth, async (req, res, next) => {
     }
     await resource.deleteOne();
     await removeResourceFromGraph(resource._id);
+    await deleteResourceFromPostgres(resource._id, {
+      actorLabel: req.user.name,
+      reason: 'Deleted by user/admin',
+    });
     res.json({ ok: true });
+
   } catch (err) { next(err); }
 });
 

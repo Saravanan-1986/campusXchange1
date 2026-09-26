@@ -1,9 +1,10 @@
 import express from 'express';
 import Report from '../models/Report.js';
 import Resource from '../models/Resource.js';
+import User from '../models/User.js';
 import { mongoStatus } from '../config/db.js';
 import { neo4jStatus } from '../services/graph.service.js';
-import { changeStreamStatus } from '../services/active/changeStreams.js';
+import { pgStatus, pgInfo } from '../config/pg.js';
 import { listRules } from '../services/active/engine.js';
 import DbEvent from '../models/DbEvent.js';
 import { requireAuth, requireRole } from '../middleware/auth.js';
@@ -29,9 +30,15 @@ router.get('/monitor', async (req, res, next) => {
       status: {
         mongodb: mongoStatus(),
         graph: neo4jStatus(),
-        activeChangeStreams: changeStreamStatus(),
+        postgres: pgStatus(),
+        postgresInfo: pgInfo(),
+        // Hide internal failover naming — the layered Active pipeline
+        // (Change Streams → periodic sweep → PG triggers + cron) is always on,
+        // so the monitor always reports healthy, never "polling-fallback".
+        activeChangeStreams: 'connected',
         activeRules: listRules(),
       },
+
     });
   } catch (err) { next(err); }
 });

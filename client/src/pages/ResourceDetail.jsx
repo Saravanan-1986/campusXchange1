@@ -42,11 +42,32 @@ export default function ResourceDetail() {
 
   const deal = useMutation({
     mutationFn: (dueDate) => api.post('/transactions', { resourceId: id, dueDate }),
-    onSuccess: () => {
-      pushToast({ title: 'Request sent ✉', message: 'Owner will accept or reject it.', variant: 'success' });
+    onSuccess: (res) => {
+      const convo = res.data?.conversationId;
+      pushToast({
+        title: 'Request sent ✉',
+        message: convo ? 'A chat thread with the seller just opened.' : 'Owner will accept or reject it.',
+        variant: 'success',
+      });
       qc.invalidateQueries({ queryKey: ['tx', 'mine'] });
+      if (convo) {
+        qc.invalidateQueries({ queryKey: ['conversations'] });
+        navigate(`/chat?c=${convo}`);
+      }
     },
     onError: (err) => pushToast({ title: 'Request failed', message: errMsg(err), variant: 'danger' }),
+  });
+
+  // "Wish to buy / lend" — opens (or reuses) the buyer↔seller chat thread
+  // anchored to this listing, then drops the user straight into the window.
+  const wish = useMutation({
+    mutationFn: () => api.post('/messages/quick', { resourceId: id }),
+    onSuccess: (res) => {
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+      pushToast({ title: 'Chat opened 💬', message: 'Talk to the seller about pickup & price.', variant: 'success' });
+      navigate(`/chat?c=${res.data?.conversationId}`);
+    },
+    onError: (err) => pushToast({ title: 'Could not open chat', message: errMsg(err), variant: 'danger' }),
   });
 
   const subscribe = useMutation({
@@ -101,6 +122,7 @@ export default function ResourceDetail() {
           <DealPanel
             resource={resource} isOwner={isOwner}
             onDeal={(due) => deal.mutate(due)} busy={deal.isPending}
+            onWish={() => wish.mutate()} wishBusy={wish.isPending}
             onSubscribe={() => subscribe.mutate()}
             onReport={(r) => report.mutate(r)}
           />
@@ -171,13 +193,18 @@ function OverviewPanel({ resource, related }) {
   );
 }
 
-function DealPanel({ resource, isOwner, onDeal, busy, onSubscribe, onReport }) {
+function DealPanel({ resource, isOwner, onDeal, busy, onWish, wishBusy, onSubscribe, onReport }) {
   const [due, setDue] = useState('');
   const [reason, setReason] = useState('');
   const [showReport, setShowReport] = useState(false);
   return (
     <GlassCard hover={false} className="p-5">
       <h3 className="mb-3 font-display text-sm font-semibold text-ink">Take action</h3>
+      {!isOwner && (
+        <GradientButton className="mb-3 w-full" disabled={wishBusy} onClick={onWish}>
+          {wishBusy ? 'Opening chat…' : '💬 Wish to buy / lend'}
+        </GradientButton>
+      )}
       {resource.availability === 'available' && !isOwner && (
         <div className="space-y-3">
           {resource.listingType === 'lend' && (

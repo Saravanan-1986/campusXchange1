@@ -44,11 +44,11 @@ export default {
         body: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        glass: '0 8px 32px rgba(2, 2, 12, 0.45)',
-        'glass-lg': '0 16px 48px rgba(2, 2, 12, 0.55)',
-        glow: '0 0 24px rgba(59, 130, 246, 0.35)',
-        'glow-violet': '0 0 24px rgba(139, 92, 246, 0.35)',
-        'glow-sm': '0 0 12px rgba(96, 165, 250, 0.35)',
+        glass: '0 8px 32px rgba(20, 5, 50, 0.55)',
+        'glass-lg': '0 16px 48px rgba(20, 5, 50, 0.65)',
+        glow: '0 0 24px rgba(139, 92, 246, 0.45)',
+        'glow-violet': '0 0 24px rgba(168, 85, 247, 0.5)',
+        'glow-sm': '0 0 12px rgba(196, 181, 253, 0.45)',
       },
       keyframes: {
         shimmer: { '0%': { backgroundPosition: '-500px 0' }, '100%': { backgroundPosition: '500px 0' } },
@@ -70,7 +70,7 @@ export default {
         aurora: 'aurora 6s ease infinite',
       },
       backgroundImage: {
-        aurora: 'linear-gradient(120deg, #3B82F6, #8B5CF6, #D946EF, #3B82F6)',
+        aurora: 'linear-gradient(120deg, #7C3AED, #A855F7, #F0ABFC, #7C3AED)',
       },
     },
   },

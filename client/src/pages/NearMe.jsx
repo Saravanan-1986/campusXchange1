@@ -1,104 +1,122 @@
-import { useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { MapContainer, TileLayer, Marker, Popup, Circle } from 'react-leaflet';
-import L from 'leaflet';
 import api, { errMsg } from '../api/axios.js';
+import ResourceCard from '../components/resource/ResourceCard.jsx';
 import { GlassCard, SectionTitle, Badge, EmptyState, Spinner } from '../components/ui/primitives.jsx';
 import { GradientButton } from '../components/ui/inputs.jsx';
 import DbTechBadge from '../components/common/DbTechBadge.jsx';
 import { useUI } from '../store/ui.js';
-import { Link } from 'react-router-dom';
 
-/** SPATIAL PARADIGM — Leaflet map over $geoWithin / $near results. */
+/**
+ * NEAR ME — Postgres spatial list view (no map).
+ * Center = your current location (or campus fallback). Radius search runs in
+ * Postgres (PostGIS / earthdistance / haversine) over geo_resource, then items
+ * are listed as cards with distance badges. Every listing gets its coordinates
+ * at creation time (pin-my-location + campus presets), so this list just works.
+ */
+const DEMO = { lat: 12.9716, lon: 77.5946 }; // seeder campus center (Bengaluru)
+
 export default function NearMe() {
-  const [center, setCenter] = useState(null);
+  const [center, setCenter] = useState(null); // [lat, lon]
+  const [label, setLabel] = useState('');
   const [radius, setRadius] = useState(5);
   const pushToast = useUI((s) => s.pushToast);
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['spatial', center, radius],
+  useEffect(() => {
+    locate(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['spatial-near', center, radius],
     enabled: !!center,
-    queryFn: async () => (await api.get('/spatial/resources/near', { params: { at: center.join(','), radius, availability: 'available' } })).data,
+    queryFn: async () => (await api.get('/spatial/resources/near', {
+      params: { at: `${center[1]},${center[0]}`, radius, availability: 'available' },
+    })).data,
   });
 
-  const locate = () => {
+  function locate(silent = false) {
+    if (!navigator.geolocation) {
+      setCenter([DEMO.lat, DEMO.lon]);
+      setLabel('Campus center');
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         setCenter([pos.coords.latitude, pos.coords.longitude]);
-        pushToast({ title: 'Centered on you ⌖', message: 'MongoDB $geoWithin query executed.', variant: 'success' });
+        setLabel('Your location');
+        if (!silent) pushToast({ title: 'Centered on you ⌖', message: 'Postgres radius query executed over geo_resource.', variant: 'success' });
       },
-      () => pushToast({
-        title: 'Using demo campus location',
-        message: 'Permission denied — showing the seeded campus center.',
-        variant: 'warning',
-      })
+      () => {
+        setCenter([DEMO.lat, DEMO.lon]);
+        setLabel('Campus center (demo)');
+        if (!silent) pushToast({ title: 'Using campus center', message: 'Permission denied — showing items around the seeded campus zone.', variant: 'warning' });
+      },
+      { timeout: 8000 }
     );
+  }
+
+  const distOf = (r) => {
+    const sql = data?.sqlRows?.find?.((s) => String(s.resource_id) === String(r._id));
+    if (sql?.distance_m != null) return (Number(sql.distance_m) / 1000).toFixed(2);
+    if (r.distanceKm != null) return Number(r.distanceKm).toFixed(2);
+    return null;
   };
-
-  // Demo fallback center (matches seeder: 77.5946, 12.9716)
-  const useDemo = () => setCenter([12.9716, 77.5946]);
-
-  const view = center || [12.9716, 77.5946];
 
   return (
     <div>
       <SectionTitle
-        title="Near Me"
-        subtitle="Resources available around you — powered by geospatial queries."
+        title="Nearby items"
+        subtitle="Listings closest to you — straight from Postgres spatial queries. No map, just distances."
         right={<DbTechBadge paradigm="spatial" tag />}
       />
-      <GlassCard hover={false} className="mb-5 flex flex-wrap items-center gap-4 p-4">
-        <GradientButton size="sm" onClick={locate}>⌖ Use my location</GradientButton>
-        <GradientButton size="sm" variant="outline" onClick={useDemo}>Demo campus center</GradientButton>
+
+      <GlassCard hover={false} className="violet-panel mb-5 flex flex-wrap items-center gap-4 p-4">
+        <GradientButton size="sm" onClick={() => locate()}>⌖ Use my location</GradientButton>
+        <GradientButton size="sm" variant="outline" onClick={() => { setCenter([DEMO.lat, DEMO.lon]); setLabel('Campus center (demo)'); }}>
+          Campus center
+        </GradientButton>
         <label className="flex items-center gap-2 text-xs text-ink-muted">
           Radius
-          <input type="range" min="1" max="25" value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="w-32 accent-[#8B5CF6]" />
+          <input type="range" min="1" max="25" value={radius} onChange={(e) => setRadius(Number(e.target.value))} className="w-32 accent-[#A855F7]" />
           <Badge tone="primary">{radius} km</Badge>
         </label>
-        {center && <Badge tone="success">querying [ {center[1].toFixed(4)}, {center[0].toFixed(4)} ]</Badge>}
+        {center && (
+          <span className="ml-auto flex flex-wrap items-center gap-2 text-[11px] text-ink-muted">
+            <Badge tone="success">⌖ {label || 'center'} · {center[1].toFixed(4)}, {center[0].toFixed(4)}</Badge>
+            {data?.provider && <Badge tone="muted">pg · {data.provider}</Badge>}
+          </span>
+        )}
       </GlassCard>
 
-      {isLoading && <div className="grid h-80 place-items-center"><Spinner className="h-8 w-8" /></div>}
+      {isLoading && <div className="grid h-60 place-items-center"><Spinner className="h-8 w-8" /></div>}
       {error && <EmptyState icon="⚠" title="Spatial query failed" message={errMsg(error)} />}
 
-      <GlassCard hover={false} className="overflow-hidden">
-        <MapContainer center={view} zoom={15} className="h-[480px] w-full">
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          {center && <Circle center={center} radius={radius * 1000} pathOptions={{ color: '#8B5CF6', fillColor: '#3B82F6', fillOpacity: 0.08, weight: 1 }} />}
-          {(data?.resources || []).map((r) => {
-            const [lng, lat] = r.location?.coordinates || [];
-            if (!Number.isFinite(lat)) return null;
-            return (
-              <Marker key={r._id} position={[lat, lng]} icon={glassIcon()}>
-                <Popup>
-                  <div className="min-w-[180px]">
-                    <div className="font-semibold text-sm" style={{ fontFamily: '"Space Grotesk", sans-serif' }}>{r.title}</div>
-                    <div className="text-[11px] opacity-75 mt-0.5">
-                      {r.listingType === 'sell' ? `₹${r.price}` : r.listingType} · {r.condition} · {r.availability}
-                    </div>
-                    <a href={`/resources/${r._id}`} className="text-[12px] underline" style={{ color: '#60A5FA' }}>open listing →</a>
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
-        </MapContainer>
-      </GlassCard>
+      {!isLoading && !error && !(data?.resources?.length) && (
+        <EmptyState
+          icon="⌖"
+          title="Nothing nearby yet"
+          message={`No available listings within ${radius} km. List one with a location pin and it will show up here instantly.`}
+        />
+      )}
 
-      {data?.resources?.length > 0 && (
-        <p className="mt-3 text-center text-xs text-ink-muted">
-          {data.resources.length} resource(s) found within {data.radiusKm} km
-          {' — '}<Link to="/resources" className="text-primary-light hover:underline">browse list view</Link>
-        </p>
+      {(data?.resources?.length > 0) && (
+        <>
+          <p className="mb-3 text-xs text-ink-muted">
+            <span className="font-semibold text-ink">{data.resources.length}</span> item(s) within{' '}
+            <span className="font-semibold text-ink">{data.radiusKm ?? radius} km</span>
+            {' '}— sorted nearest-first · <Link to="/resources" className="text-primary-light hover:underline">browse all</Link>
+          </p>
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {data.resources.map((r) => <ResourceCard key={r._id} resource={r} distanceKm={distOf(r)} />)}
+          </div>
+          <div className="mt-4 text-center">
+            <GradientButton size="sm" variant="outline" onClick={() => refetch()}>↻ Refresh nearby</GradientButton>
+          </div>
+        </>
       )}
     </div>
   );
 }
 
-// Custom glass divIcon (avoids default-marker asset path issues)
-function glassIcon() {
-  return L.divIcon({ className: '', html: '<div class="cx-marker"></div>', iconSize: [18, 18], iconAnchor: [9, 9] });
-}

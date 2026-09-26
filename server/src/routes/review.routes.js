@@ -1,7 +1,9 @@
 import express from 'express';
 import Review from '../models/Review.js';
+import Resource from '../models/Resource.js';
 import { requireAuth } from '../middleware/auth.js';
 import { syncReviewToGraph } from '../services/graph.service.js';
+import { syncResourceToPostgres } from '../services/pg/sync.service.js';
 import { logDbEvent } from '../services/eventlog.service.js';
 
 /** Reviews & ratings — for both resources and materials. */
@@ -29,8 +31,15 @@ router.post('/', requireAuth, async (req, res, next) => {
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
     const agg = await Review.syncAggregates(targetType, targetId);
-    if (targetType === 'resource') syncReviewToGraph(req.user._id, req.user.name, targetId, rating).catch(() => {});
+    if (targetType === 'resource') {
+      syncReviewToGraph(req.user._id, req.user.name, targetId, rating).catch(() => {});
+      Resource.findById(targetId).then((r) => r && syncResourceToPostgres(r, {
+        actorLabel: req.user.name,
+        reason: `Rating changed to ${agg.ratingAvg}★ (${agg.ratingCount} reviews)`,
+      })).catch(() => {});
+    }
     await logDbEvent('graph', 'review.sync', `${req.user.name} rated ${targetType} ${rating}★`, { targetId: String(targetId) });
+
     res.status(201).json({ review, aggregates: agg });
   } catch (err) { next(err); }
 });

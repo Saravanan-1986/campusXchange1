@@ -1,6 +1,7 @@
 import Request from '../../models/Request.js';
 import Notification from '../../models/Notification.js';
 import User from '../../models/User.js';
+import Resource from '../../models/Resource.js';
 import { env } from '../../config/env.js';
 import { notify } from '../notification.service.js';
 import { logDbEvent } from '../eventlog.service.js';

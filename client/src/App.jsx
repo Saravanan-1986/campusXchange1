@@ -10,7 +10,7 @@ import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Verify from './pages/Verify.jsx';
 
-// Heavy pages (leaflet, force-graph, big forms) load on demand — keeps the
+// Heavy pages (force-graph, big forms) load on demand — keeps the
 // first paint fast and isolates any import failure to its own route.
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Marketplace = lazy(() => import('./pages/Marketplace.jsx'));
@@ -19,10 +19,10 @@ const CreateResource = lazy(() => import('./pages/CreateResource.jsx'));
 const KnowledgeHub = lazy(() => import('./pages/KnowledgeHub.jsx'));
 const MaterialDetail = lazy(() => import('./pages/MaterialDetail.jsx'));
 const NearMe = lazy(() => import('./pages/NearMe.jsx'));
+const Chat = lazy(() => import('./pages/Chat.jsx'));
 const Notifications = lazy(() => import('./pages/Notifications.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const Admin = lazy(() => import('./pages/Admin.jsx'));
-const HowItWorks = lazy(() => import('./pages/HowItWorks.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 function BootScreen() {
@@ -68,9 +68,9 @@ export default function App() {
           <Route path="/materials/new" element={<PageTransition><KnowledgeHub /></PageTransition>} />
           <Route path="/materials/:id" element={<PageTransition><MaterialDetail /></PageTransition>} />
           <Route path="/near-me" element={<PageTransition><NearMe /></PageTransition>} />
+          <Route path="/chat" element={<PageTransition><Chat /></PageTransition>} />
           <Route path="/notifications" element={<PageTransition><Notifications /></PageTransition>} />
           <Route path="/profile" element={<PageTransition><Profile /></PageTransition>} />
-          <Route path="/how-it-works" element={<PageTransition><HowItWorks /></PageTransition>} />
           <Route path="/admin" element={<RequireAuth admin><PageTransition><Admin /></PageTransition></RequireAuth>} />
         </Route>
 

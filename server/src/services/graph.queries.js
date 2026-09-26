@@ -85,10 +85,20 @@ export async function getGraphData(resourceId, depth = 2) {
     async () => {
       const c = await Resource.findById(resourceId).lean();
       if (!c) return { nodes: [], links: [] };
-      const related = await Resource.find({
-        $or: [{ subject: c.subject || c.category }, { category: c.category }],
+      const key = c.subject || c.category;
+      // Neighbours in this subject/category first…
+      const primary = await Resource.find({
         _id: { $ne: c._id },
-      }).limit(6).lean();
+        $or: [{ subject: key }, { category: c.category }],
+      }).limit(8).lean();
+      // …then top up from the same department so the star is never sparse.
+      let related = primary;
+      if (related.length < 5) {
+        const seen = new Set([String(c._id), ...primary.map((x) => String(x._id))]);
+        const more = await Resource.find({ _id: { $nin: [...seen] }, department: c.department })
+          .sort({ ratingAvg: -1, createdAt: -1 }).limit(5 - related.length).lean();
+        related = [...primary, ...more];
+      }
       return buildFallbackGraph(c, related);
     },
     true

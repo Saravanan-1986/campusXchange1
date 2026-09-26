@@ -12,7 +12,7 @@ export default function Topbar() {
   const [bellOpen, setBellOpen] = useState(false);
   const bellRef = useRef(null);
   const navigate = useNavigate();
-  const { unread, setUnread } = useUI();
+  const { unread, setUnread, chatUnread } = useUI();
   const { user, token } = useAuth();
 
   const { data: notifData } = useQuery({
@@ -52,6 +52,14 @@ export default function Topbar() {
         <div className="ml-auto flex items-center gap-3">
           <Link to="/resources/new">
             <GradientButton size="sm" className="hidden sm:inline-flex">＋ List a resource</GradientButton>
+          </Link>
+          <Link to="/chat" className="relative grid h-9 w-9 place-items-center rounded-xl border border-white/10 bg-white/5 text-ink transition hover:border-accent/50" aria-label="Chat">
+            💬
+            {chatUnread > 0 && (
+              <span className="absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white shadow-glow">
+                {chatUnread > 9 ? '9+' : chatUnread}
+              </span>
+            )}
           </Link>
           <div ref={bellRef} className="relative">
             <button

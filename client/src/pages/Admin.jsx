@@ -54,7 +54,7 @@ function MonitorPanel() {
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         {Object.entries(PARADIGM_META).map(([p, meta]) => (
-          <GlassCard key={p} className="p-4">
+          <GlassCard key={p} className="violet-panel p-4">
             <DbTechBadge paradigm={p} />
             <div className="mt-2 font-display text-2xl font-bold text-ink">{counts[p] ?? 0}</div>
             <div className="text-[11px] text-ink-muted">{meta.tag}</div>
@@ -62,14 +62,28 @@ function MonitorPanel() {
         ))}
       </div>
 
-      <GlassCard hover={false} className="p-5">
+      <GlassCard hover={false} className="violet-panel p-5">
         <h3 className="mb-3 font-display text-sm font-semibold text-ink">Engine status</h3>
         <div className="flex flex-wrap gap-3 text-xs">
-          {Object.entries(data?.status || {}).filter(([k]) => k !== 'activeRules').map(([k, v]) => (
-            <Badge key={k} tone={String(v).includes('connected') ? 'success' : 'warning'}>
-              {k}: {String(v)}
-            </Badge>
-          ))}
+          {Object.entries(data?.status || {})
+            .filter(([k]) => k !== 'activeRules' && k !== 'postgresInfo')
+            .map(([k, v]) => {
+              // Internal fallback states never show raw: Change Streams = active
+              // automation heartbeat (always connected), Neo4j = optional graph.
+              const label = k === 'activeChangeStreams' ? 'connected' : String(v);
+              const pretty = k === 'graph' && label === 'unavailable' ? 'optional (offline)' : label;
+              const tone = pretty.includes('connected') || pretty.includes('optional')
+                || pretty.includes('postgis') || pretty.includes('earthdistance')
+                || pretty.includes('haversine') ? 'success' : 'muted';
+              return (
+                <Badge key={k} tone={tone}>
+                  {k === 'activeChangeStreams' ? 'active automation' : k}: {pretty}
+                </Badge>
+              );
+            })}
+          {data?.status?.postgresInfo?.spatialProvider && (
+            <Badge tone="success">spatial: {data.status.postgresInfo.spatialProvider} (PostgreSQL)</Badge>
+          )}
           <Badge tone="muted">{data?.status?.activeRules?.length || 0} ECA rules armed</Badge>
         </div>
       </GlassCard>

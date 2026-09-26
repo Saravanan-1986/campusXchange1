@@ -4,7 +4,10 @@ import Resource from '../models/Resource.js';
 import { requireAuth } from '../middleware/auth.js';
 import { recordResourceState } from '../services/history.service.js';
 import { syncUsedToGraph } from '../services/graph.service.js';
+import { syncResourceToPostgres, syncTransactionToPostgres } from '../services/pg/sync.service.js';
+import { recordLendPeriod, closeLendPeriod } from '../services/pg/temporal.service.js';
 import { fireEvent } from '../services/active/engine.js';
+import { openThread, sendThreadMessage } from '../services/chat.service.js';
 import { logDbEvent } from '../services/eventlog.service.js';
 
 /**
@@ -34,7 +37,25 @@ router.post('/', requireAuth, async (req, res, next) => {
       message,
     });
     await logDbEvent('mongodb', 'tx.requested', `${req.user.name} requested "${resource.title}"`, { txId: String(tx._id) });
-    res.status(201).json({ transaction: tx });
+    await syncTransactionToPostgres(tx);
+
+    // Wish-to-buy/lend handshake: a chat window opens between seller & buyer,
+    // linked to this listing + deal, seeded with the buyer's request note.
+    let conversationId = null;
+    try {
+      const convo = await openThread({
+        meId: req.user._id, peerId: resource.ownerId,
+        resourceId: resource._id, transactionId: tx._id,
+        subject: `Deal: ${resource.title}`,
+      });
+      conversationId = String(convo._id);
+      const note = String(message || '').trim() || `Hi! I'd like to ${resource.listingType} "${resource.title}".`;
+      await sendThreadMessage({ conversation: convo, me: req.user, peerId: resource.ownerId, body: note });
+    } catch (err) {
+      console.warn('[chat] auto-thread notice:', err.message);
+    }
+    res.status(201).json({ transaction: tx, conversationId });
+
   } catch (err) { next(err); }
 });
 
@@ -79,6 +100,19 @@ router.patch('/:id/status', requireAuth, async (req, res, next) => {
       resource.availability = 'lent';
       await resource.save();
       await recordResourceState(resource, { actorLabel: 'system:transaction', source: 'automation', fields: ['availability'], summary: 'Lent out (lend cycle start)' });
+      await syncResourceToPostgres(resource, { actorLabel: 'system:transaction', reason: 'Lent out — lend period opened' });
+      // GiST exclusion constraint guards double-lending in PG
+      try {
+        await recordLendPeriod({
+          resourceId: resource._id,
+          borrowerId: tx.borrower,
+          borrowerLabel: req.user.name,
+          lendStart: new Date(),
+          lendEnd: tx.dueDate || null,
+        });
+      } catch (err) {
+        console.warn('[temporal] recordLendPeriod notice:', err.message);
+      }
     }
     if (status === 'completed' && ['sell', 'exchange', 'donate'].includes(tx.type)) {
       resource.availability = 'unavailable';
@@ -88,13 +122,26 @@ router.patch('/:id/status', requireAuth, async (req, res, next) => {
         actorLabel: 'system:transaction', source: 'automation', fields: ['availability', 'ownerId'],
         summary: `Ownership transferred via ${tx.type} (viva: temporal owner change)`,
       });
+      await syncResourceToPostgres(resource, {
+        actorLabel: 'system:transaction',
+        reason: `Ownership transferred via ${tx.type}`,
+      });
       await syncUsedToGraph(tx.borrower, tx.resource._id);
     }
     if (status === 'returned') {
       resource.availability = 'available';
       await resource.save();
       await recordResourceState(resource, { actorLabel: 'system:transaction', source: 'automation', fields: ['availability'], summary: 'Returned — lend cycle closed' });
+      await syncResourceToPostgres(resource, { actorLabel: 'system:transaction', reason: 'Returned — lend cycle closed' });
+      try {
+        await closeLendPeriod(resource._id, tx.borrower, new Date());
+      } catch (err) {
+        console.warn('[temporal] closeLendPeriod notice:', err.message);
+      }
     }
+
+    await syncTransactionToPostgres(tx);
+
 
     const after = tx.toObject();
     after.resource = tx.resource;

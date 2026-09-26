@@ -10,9 +10,9 @@ import { PARADIGM_META } from '../theme/theme.js';
 const FEATURES = [
   { p: 'mongodb', title: 'Document Store Core', body: 'Users, listings, materials, deals & reviews live in MongoDB collections with rich text filters.' },
   { p: 'graph', title: 'Graph Discovery', body: 'Neo4j traverses Student↔Resource↔Subject↔Department edges to power related-resource & collaborative recommendations, visualized as a glowing force-graph.' },
-  { p: 'temporal', title: 'Lifecycle Time Machine', body: 'Every listing change (price, owner, lend/return) writes a validFrom/validTo versioned snapshot — browse any resource\u2019s full history timeline.' },
-  { p: 'active', title: 'Event-Condition-Action', body: 'MongoDB Change Streams + node-cron trigger automation: availability alerts, overdue reminders, auto-flagging on reports — pushed live over Socket.io.' },
-  { p: 'spatial', title: 'Spatial "Near Me"', body: 'A 2dsphere geospatial index and $near / $geoWithin queries surface resources & students around you on a live map.' },
+  { p: 'temporal', title: 'Lifecycle Time Machine', body: 'Every listing change (price, owner, lend/return) writes a validFrom/validTo versioned snapshot in Postgres — browse any resource’s full history timeline.' },
+  { p: 'active', title: 'Event-Condition-Action', body: 'Postgres triggers + node-cron run the automation: availability alerts, overdue reminders, auto-flagging on reports — pushed live over Socket.io.' },
+  { p: 'spatial', title: 'Nearby Items', body: 'Every listing saves pickup coordinates into Postgres geo_resource at creation — Nearby items ranks them by true distance from you. No map needed.' },
 ];
 
 export default function Landing() {
@@ -48,8 +48,8 @@ export default function Landing() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Link to="/register"><GradientButton size="lg">Create free account</GradientButton></Link>
-            <Link to="/how-it-works">
-              <GradientButton size="lg" variant="outline">See how it works</GradientButton>
+            <Link to="/login">
+              <GradientButton size="lg" variant="outline">Sign in</GradientButton>
             </Link>
           </div>
         </motion.div>

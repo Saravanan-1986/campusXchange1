@@ -1,6 +1,7 @@
 import express from 'express';
 import User from '../models/User.js';
 import { requireAuth } from '../middleware/auth.js';
+import { syncUserToPostgres } from '../services/pg/sync.service.js';
 
 /** Users — profile CRUD + geolocation capture (spatial paradigm). */
 const router = express.Router();
@@ -27,7 +28,9 @@ router.patch('/me', requireAuth, async (req, res, next) => {
     }
     await req.user.save();
     await req.user.updateOne({ $unset: { verifyToken: 1 } }); // cleanup noise
+    await syncUserToPostgres(req.user);
     res.json({ user: publicUser(req.user) });
+
   } catch (err) { next(err); }
 });
 

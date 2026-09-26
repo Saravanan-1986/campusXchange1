@@ -1,4 +1,6 @@
 import { NavLink } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import api from '../../api/axios.js';
 import { useAuth } from '../../store/auth.js';
 import { useUI } from '../../store/ui.js';
 import DbTechBadge from '../common/DbTechBadge.jsx';
@@ -7,15 +9,27 @@ const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: '◈' },
   { to: '/resources', label: 'Marketplace', icon: '⇄' },
   { to: '/materials', label: 'Knowledge Hub', icon: '❖' },
-  { to: '/near-me', label: 'Near Me', icon: '⌖' },
+  { to: '/near-me', label: 'Nearby items', icon: '⌖' },
+  { to: '/chat', label: 'Chat', icon: '💬' },
   { to: '/notifications', label: 'Notifications', icon: '◔' },
   { to: '/profile', label: 'Profile', icon: '☺' },
-  { to: '/how-it-works', label: 'How it works', icon: '✦', dev: true },
 ];
 
 export default function Sidebar() {
-  const { user, logout } = useAuth();
-  const { sidebarOpen, toggleSidebar } = useUI();
+  const { user, logout, token } = useAuth();
+  const { sidebarOpen, toggleSidebar, chatUnread, setChatUnread } = useUI();
+
+  // CHAT badge baseline — refreshed every 20s; live deltas arrive via socket.
+  useQuery({
+    queryKey: ['conversations', 'badge'],
+    queryFn: async () => {
+      const data = (await api.get('/messages/conversations')).data;
+      setChatUnread(data.unreadTotal || 0);
+      return data;
+    },
+    enabled: !!token,
+    refetchInterval: 20000,
+  });
 
   return (
     <aside
@@ -40,7 +54,7 @@ export default function Sidebar() {
             to={item.to}
             title={item.label}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
+              `relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
                 isActive
                   ? 'aurora-border font-semibold text-ink shadow-glow-sm'
                   : 'text-ink-muted hover:bg-white/5 hover:text-ink'
@@ -49,7 +63,15 @@ export default function Sidebar() {
           >
             <span className="w-5 text-center text-base">{item.icon}</span>
             {sidebarOpen && <span className="truncate">{item.label}</span>}
-            {item.dev && sidebarOpen && <DbTechBadge paradigm="mongodb" className="ml-auto scale-90" />}
+            {item.to === '/chat' && chatUnread > 0 && (
+              <span
+                className={`grid h-[18px] min-w-[18px] place-items-center rounded-full bg-danger px-1 text-[10px] font-bold text-white shadow-glow ${
+                  sidebarOpen ? 'ml-auto' : 'absolute right-1.5 top-1'
+                }`}
+              >
+                {chatUnread > 9 ? '9+' : chatUnread}
+              </span>
+            )}
           </NavLink>
         ))}
         {user?.role === 'admin' && (
