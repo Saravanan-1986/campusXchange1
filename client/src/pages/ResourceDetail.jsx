@@ -85,6 +85,20 @@ export default function ResourceDetail() {
     onSuccess: () => pushToast({ title: 'Reported 🚩', message: 'Auto-flag ECA rule armed at 3 reports.', variant: 'warning' }),
   });
 
+  // Owner removes a listing once it's sold / given away (DELETE cascades to
+  // graph + soft-deletes the Postgres mirror, keeping temporal history).
+  const removeListing = useMutation({
+    mutationFn: () => api.delete(`/resources/${id}`),
+    onSuccess: () => {
+      pushToast({ title: 'Listing removed 🗑', message: 'It no longer appears on the marketplace.', variant: 'success' });
+      qc.invalidateQueries({ queryKey: ['resources'] });
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+      qc.removeQueries({ queryKey: ['resource', id] });
+      navigate('/resources');
+    },
+    onError: (err) => pushToast({ title: 'Could not remove listing', message: errMsg(err), variant: 'danger' }),
+  });
+
   if (isLoading) {
     return <div className="grid h-64 place-items-center"><Spinner className="h-8 w-8" /></div>;
   }
@@ -125,6 +139,7 @@ export default function ResourceDetail() {
             onWish={() => wish.mutate()} wishBusy={wish.isPending}
             onSubscribe={() => subscribe.mutate()}
             onReport={(r) => report.mutate(r)}
+            onRemove={() => removeListing.mutate()} removeBusy={removeListing.isPending}
           />
           <OwnerCard owner={resource.ownerId} />
         </div>
@@ -193,10 +208,11 @@ function OverviewPanel({ resource, related }) {
   );
 }
 
-function DealPanel({ resource, isOwner, onDeal, busy, onWish, wishBusy, onSubscribe, onReport }) {
+function DealPanel({ resource, isOwner, onDeal, busy, onWish, wishBusy, onSubscribe, onReport, onRemove, removeBusy }) {
   const [due, setDue] = useState('');
   const [reason, setReason] = useState('');
   const [showReport, setShowReport] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   return (
     <GlassCard hover={false} className="p-5">
       <h3 className="mb-3 font-display text-sm font-semibold text-ink">Take action</h3>
@@ -220,7 +236,29 @@ function DealPanel({ resource, isOwner, onDeal, busy, onWish, wishBusy, onSubscr
           👀 Alert me when available
         </GradientButton>
       )}
-      {isOwner && <p className="text-xs text-ink-muted">Your listing — incoming requests appear on your Dashboard.</p>}
+      {isOwner && (
+        <div className="space-y-2">
+          <p className="text-xs text-ink-muted">Your listing — incoming requests appear on your Dashboard.</p>
+          {confirmRemove ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onRemove} disabled={removeBusy}
+                className="rounded-xl border border-danger/40 bg-danger/15 px-3 py-1.5 text-xs font-semibold text-danger hover:bg-danger/25 disabled:opacity-60"
+              >
+                {removeBusy ? 'Removing…' : 'Yes, remove it'}
+              </button>
+              <button onClick={() => setConfirmRemove(false)} className="text-xs text-ink-muted hover:text-ink">Cancel</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmRemove(true)}
+              className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-danger/85 hover:border-danger/40 hover:text-danger"
+            >
+              🗑 Remove from listing {resource.availability === 'unavailable' ? '(sold / given away)' : ''}
+            </button>
+          )}
+        </div>
+      )}
       <div className="mt-4 border-t border-white/8 pt-3">
         {showReport ? (
           <div className="flex gap-2">

@@ -24,6 +24,7 @@ export default function Chat() {
   const setChatUnread = useUI((s) => s.setChatUnread);
   const [draft, setDraft] = useState('');
   const [showList, setShowList] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
   const scrollRef = useRef(null);
 
   const { data: list, isLoading: listLoading } = useQuery({
@@ -79,6 +80,23 @@ export default function Chat() {
     onError: (err) => useUI.getState().pushToast({ title: 'Message failed', message: errMsg(err), variant: 'danger' }),
   });
 
+  // Seller/giver removes the listing straight from this window once the item
+  // is sold or given away — same owner-guarded DELETE as the marketplace page.
+  const removeListing = useMutation({
+    mutationFn: (resourceId) => api.delete(`/resources/${resourceId}`),
+    onSuccess: () => {
+      setConfirmRemove(false);
+      useUI.getState().pushToast({ title: 'Listing removed 🗑', message: 'It no longer appears on the marketplace.', variant: 'success' });
+      qc.invalidateQueries({ queryKey: ['resources'] });
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+      qc.invalidateQueries({ queryKey: ['conversation', activeId] });
+    },
+    onError: (err) => useUI.getState().pushToast({ title: 'Could not remove listing', message: errMsg(err), variant: 'danger' }),
+  });
+
+  // Switching threads resets the inline remove confirmation.
+  useEffect(() => { setConfirmRemove(false); }, [activeId]);
+
   const submit = (e) => {
     e.preventDefault();
     const body = draft.trim();
@@ -93,6 +111,14 @@ export default function Chat() {
   const peer = thread?.peer || active?.peer || null;
   const messages = thread?.messages || [];
   const totalUnread = list?.unreadTotal || 0;
+
+  // Only the listing's owner (seller/giver) — or an admin — sees the remove action.
+  const threadResource = active?.resource?._id ? active.resource : null;
+  const canRemoveListing = !!(
+    threadResource &&
+    user &&
+    (String(threadResource.ownerId?._id || threadResource.ownerId) === String(user.id) || user.role === 'admin')
+  );
 
   return (
     <div>
@@ -181,12 +207,35 @@ export default function Chat() {
               <span className="text-sm text-ink-muted">Pick a conversation</span>
             )}
             {active?.resource?._id && (
-              <Link
-                to={`/resources/${active.resource._id}`}
-                className="ml-auto max-w-[45%] truncate rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-primary-light hover:border-accent/50"
-              >
-                ⇄ {active.resource.title}
-              </Link>
+              <div className="ml-auto flex items-center gap-2">
+                <Link
+                  to={`/resources/${active.resource._id}`}
+                  className="max-w-[45%] truncate rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-primary-light hover:border-accent/50"
+                >
+                  ⇄ {active.resource.title}
+                </Link>
+                {canRemoveListing && (
+                  confirmRemove ? (
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <button
+                        onClick={() => removeListing.mutate(active.resource._id)}
+                        disabled={removeListing.isPending}
+                        className="rounded-lg border border-danger/40 bg-danger/15 px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger/25 disabled:opacity-60"
+                      >
+                        {removeListing.isPending ? 'Removing…' : 'Yes, remove'}
+                      </button>
+                      <button onClick={() => setConfirmRemove(false)} className="shrink-0 text-[11px] text-ink-muted hover:text-ink">Cancel</button>
+                    </span>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmRemove(true)}
+                      className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-danger/85 hover:border-danger/40 hover:text-danger"
+                    >
+                      🗑 Remove listing
+                    </button>
+                  )
+                )}
+              </div>
             )}
           </div>
 

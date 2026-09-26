@@ -23,7 +23,7 @@ router.get('/conversations', requireAuth, async (req, res, next) => {
   try {
     const conversations = await Conversation.find({ participants: req.user._id })
       .populate('participants', 'name department semester')
-      .populate('resource', 'title images price')
+      .populate('resource', 'title images price ownerId availability')
       .sort({ lastMessageAt: -1 })
       .limit(60)
       .lean();
