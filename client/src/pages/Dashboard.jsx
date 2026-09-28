@@ -41,7 +41,7 @@ export default function Dashboard() {
   const deals = [...(txData?.incoming || []), ...(txData?.outgoing || [])].slice(0, 6);
   const conversations = (chatData?.conversations || []).slice(0, 5);
   const stats = [
-    { label: 'My listings', value: mine?.resources?.length ?? '—', icon: '⇄', to: '/resources' },
+    { label: 'My listings', value: mine?.resources?.length ?? '—', icon: '📦', to: '/my-items' },
     { label: 'Open deals', value: deals.filter((d) => d.status === 'pending' || d.status === 'accepted').length || '—', icon: '✉', to: '/dashboard' },
     { label: 'Chat', value: chatUnread > 0 ? `${chatUnread} new` : (conversations.length || '—'), icon: '💬', to: '/chat', badge: chatUnread },
     { label: 'Dept', value: user?.department || '—', icon: '❖', to: '/profile' },

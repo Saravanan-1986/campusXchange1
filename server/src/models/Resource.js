@@ -26,6 +26,21 @@ const resourceSchema = new mongoose.Schema(
       default: 'available',
     },
     ownerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    /**
+     * LISTING STATE — an item can be owned yet deliberately kept OFF the
+     * marketplace: pulled from the listing by its owner, or received from
+     * another student and not re-listed yet ("Items received").
+     */
+    isListed: { type: Boolean, default: true },
+    /**
+     * HANDOVER CHAIN — the item keeps its identity when it changes hands, so
+     * the receiver is recorded here and the full chain of previous users lives
+     * in PostgreSQL (custody_period valid-time periods + cx_custody_chain()).
+     */
+    receivedFrom: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    receivedAt: { type: Date, default: null },
+    receivedVia: { type: String, enum: ['sell', 'donate', 'exchange', null], default: null },
+    transferCount: { type: Number, default: 0 },
     images: [{ type: String }], // uploaded filenames served from /uploads
     tags: [{ type: String, lowercase: true }],
     // SPATIAL paradigm — geospatial point + 2dsphere index
@@ -45,5 +60,7 @@ const resourceSchema = new mongoose.Schema(
 resourceSchema.index({ location: '2dsphere' }); // SPATIAL paradigm: $near / $geoWithin
 resourceSchema.index({ title: 'text', description: 'text', tags: 'text' });
 resourceSchema.index({ category: 1, availability: 1, price: 1 });
+resourceSchema.index({ ownerId: 1, isListed: 1, createdAt: -1 }); // My Items
+resourceSchema.index({ ownerId: 1, receivedFrom: 1 });           // Items received
 
 export default mongoose.model('Resource', resourceSchema);

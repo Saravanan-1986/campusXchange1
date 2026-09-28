@@ -31,6 +31,8 @@ const resourceHistorySchema = new mongoose.Schema(
       ownerName: String, // stored anonymized for public timelines
       category: String,
       subject: String,
+      isListed: Boolean, // false = owned but pulled off the marketplace
+      transferCount: Number,
     },
     change: {
       fields: [{ type: String }],

@@ -5,6 +5,9 @@ import { upload } from '../middleware/upload.js';
 import { recordResourceState, getResourceTimeline } from '../services/history.service.js';
 import { syncResourceToGraph, removeResourceFromGraph } from '../services/graph.service.js';
 import { syncResourceToPostgres, deleteResourceFromPostgres } from '../services/pg/sync.service.js';
+import {
+  transferResource, unlistResource, relistResource, HANDOVER_MODES,
+} from '../services/transfer.service.js';
 import { logDbEvent } from '../services/eventlog.service.js';
 
 /**
@@ -34,8 +37,11 @@ function parseLocation(body) {
 // LIST + FILTER (+ optional geospatial `near` filter)
 router.get('/', async (req, res, next) => {
   try {
-    const { q, category, condition, listingType, minPrice, maxPrice, availability, department, semester, near, radius, sort } = req.query;
+    const { q, category, condition, listingType, minPrice, maxPrice, availability, department, semester, near, radius, sort, includeUnlisted } = req.query;
     const filter = {};
+    // Items pulled off the marketplace (or received and not re-listed yet) are
+    // owned by somebody but NOT part of the marketplace feed.
+    if (includeUnlisted !== 'true') filter.isListed = { $ne: false };
     if (q) filter.$text = { $search: q };
     if (category) filter.category = category;
     if (condition) filter.condition = condition;
@@ -109,11 +115,47 @@ router.post('/', requireAuth, upload.array('images', 4), async (req, res, next) 
   } catch (err) { next(err); }
 });
 
-// MY LISTINGS
+// MY ITEMS — everything I currently own: live listings, items I pulled off the
+// marketplace, and things I received from other students. Powers /my-items.
 router.get('/mine', requireAuth, async (req, res, next) => {
   try {
-    const resources = await Resource.find({ ownerId: req.user._id }).sort({ createdAt: -1 }).lean();
-    res.json({ resources });
+    const resources = await Resource.find({ ownerId: req.user._id })
+      .populate('ownerId', 'name department semester')
+      .sort({ isListed: -1, createdAt: -1 })
+      .lean();
+    const shaped = resources.map((r) => ({
+      ...r,
+      isListed: r.isListed !== false,
+      received: !!r.receivedFrom,
+    }));
+    res.json({
+      resources: shaped,
+      counts: {
+        total: shaped.length,
+        listed: shaped.filter((r) => r.isListed).length,
+        unlisted: shaped.filter((r) => !r.isListed).length,
+        received: shaped.filter((r) => r.received).length,
+      },
+    });
+  } catch (err) { next(err); }
+});
+
+// ITEMS RECEIVED — products that came from another student (donate / sell in
+// chat). Each one can be re-listed (see POST /:id/relist) so it keeps moving.
+router.get('/received', requireAuth, async (req, res, next) => {
+  try {
+    const resources = await Resource.find({ ownerId: req.user._id, receivedFrom: { $ne: null } })
+      .populate('receivedFrom', 'name department')
+      .sort({ receivedAt: -1 })
+      .lean();
+    res.json({
+      resources: resources.map((r) => ({ ...r, isListed: r.isListed !== false })),
+      counts: {
+        total: resources.length,
+        listed: resources.filter((r) => r.isListed !== false).length,
+        handovers: resources.reduce((sum, r) => sum + Number(r.transferCount || 0), 0),
+      },
+    });
   } catch (err) { next(err); }
 });
 
@@ -185,6 +227,85 @@ router.get('/:id/history', async (req, res, next) => {
   try {
     const history = await getResourceTimeline(req.params.id);
     res.json({ history });
+  } catch (err) { next(err); }
+});
+
+/**
+ * REMOVE FROM MARKETPLACE (owner/admin) — the item stays with its owner, it just
+ * stops being advertised. This is the "no chat, just take it down" path; the
+ * custody chain gets an 'unlisted' period so the timeline stays honest.
+ */
+router.post('/:id/unlist', requireAuth, async (req, res, next) => {
+  try {
+    const { resource, alreadyUnlisted } = await unlistResource({
+      resourceId: req.params.id,
+      actor: req.user,
+      note: String(req.body?.note || '').slice(0, 300),
+    });
+    res.json({
+      ok: true,
+      alreadyUnlisted,
+      resource,
+      message: alreadyUnlisted
+        ? `"${resource.title}" was already off the marketplace.`
+        : `"${resource.title}" is no longer on the marketplace — it stays with you.`,
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * RE-LIST (owner) — put an item you own (very often one you RECEIVED from
+ * another student) back on the marketplace as a sell or donate listing.
+ */
+router.post('/:id/relist', requireAuth, async (req, res, next) => {
+  try {
+    const listingType = HANDOVER_MODES.includes(req.body?.listingType) ? req.body.listingType : 'donate';
+    const result = await relistResource({
+      resourceId: req.params.id,
+      actor: req.user,
+      listingType,
+      price: req.body?.price,
+      title: req.body?.title,
+      description: req.body?.description,
+    });
+    res.json({
+      ok: true,
+      ...result,
+      message: result.reListed
+        ? `"${result.resource.title}" is back on the marketplace as ${listingType}.`
+        : `"${result.resource.title}" is already listed as ${listingType}.`,
+    });
+  } catch (err) { next(err); }
+});
+
+/**
+ * HANDOVER (owner/admin) — give the item to a student directly (not via chat):
+ * POST { toUserId, mode: 'donate' | 'sell', price }.
+ * The chat slash commands (/donate, /sell) run through the very same service.
+ */
+router.post('/:id/transfer', requireAuth, async (req, res, next) => {
+  try {
+    const { toUserId, mode = 'donate', price = null, note = '' } = req.body || {};
+    if (!toUserId) return res.status(400).json({ message: 'toUserId is required' });
+    const result = await transferResource({
+      resourceId: req.params.id,
+      toUserId,
+      mode,
+      price,
+      actor: req.user,
+      note: String(note || '').slice(0, 300),
+    });
+    res.json({
+      ok: true,
+      mode: result.mode,
+      price: result.price,
+      transactionId: String(result.transaction._id),
+      resource: result.resource,
+      receiver: { _id: result.toUser._id, name: result.toUser.name },
+      message: result.mode === 'donate'
+        ? `"${result.resource.title}" was donated to ${result.toUser.name}.`
+        : `"${result.resource.title}" was sold to ${result.toUser.name} for ₹${result.price}.`,
+    });
   } catch (err) { next(err); }
 });
 

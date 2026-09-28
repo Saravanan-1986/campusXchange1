@@ -12,6 +12,8 @@
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
+  },
+  "dependencies": {
+    "neo4j-driver": "^6.2.0"
   }
 }
-

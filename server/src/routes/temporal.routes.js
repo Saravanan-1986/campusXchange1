@@ -9,6 +9,7 @@ import { logDbEvent } from '../services/eventlog.service.js';
  * TEMPORAL PARADIGM endpoints — served by PostgreSQL (resource_version + lend_period).
  *
  *   GET /api/temporal/resources/:id/timeline     versioned lifecycle
+ *   GET /api/temporal/resources/:id/custody      ownership chain (previous users)
  *   GET /api/temporal/resources/:id/as-of?at=…   time travel
  *   GET /api/temporal/resources/:id/prices       price trajectory (window fn)
  *   GET /api/temporal/resources/:id/spot         campus zone + distance
@@ -103,6 +104,40 @@ router.get('/intervals', async (req, res, next) => {
       source: 'postgresql',
       intervals: await temporal.getIntervalProof(req.query.resourceId || null, req.query.limit),
     });
+  } catch (err) { next(err); }
+});
+
+/**
+ * CUSTODY CHAIN — "who owned this product before me?" (custody_period periods).
+ * This is the previous-users timeline shown on a listing that has changed hands.
+ */
+router.get('/resources/:id/custody', async (req, res, next) => {
+  try {
+    if (!guard(res)) return;
+    const [chain, integrity] = await Promise.all([
+      temporal.getCustodyChain(req.params.id),
+      temporal.getCustodyIntegrity(req.params.id),
+    ]);
+    await logDbEvent('temporal', 'query.custody',
+      `Custody chain of ${req.params.id} → ${chain.length} custodian(s)`, {});
+    res.json({
+      source: 'postgresql',
+      table: 'custody_period',
+      rule: 'EXCLUDE (resource_id =, scope &&) — one item can never have two owners at the same instant.',
+      chain,
+      integrity: integrity[0] || null,
+    });
+  } catch (err) { next(err); }
+});
+
+/** Recent handovers (optionally only mine) — the "items in motion" feed. */
+router.get('/handovers', requireAuth, async (req, res, next) => {
+  try {
+    if (!guard(res)) return;
+    const mineOnly = req.query.mine === 'true';
+    const userId = req.query.userId || (mineOnly ? req.user?._id : null);
+    const handovers = await temporal.getRecentHandovers(req.query.limit || 25, userId || null);
+    res.json({ source: 'postgresql', function: 'cx_recent_handovers()', handovers });
   } catch (err) { next(err); }
 });
 

@@ -5,7 +5,9 @@ import Message from '../models/Message.js';
 import User from '../models/User.js';
 import Resource from '../models/Resource.js';
 import { requireAuth } from '../middleware/auth.js';
-import { openThread, sendThreadMessage } from '../services/chat.service.js';
+import {
+  openThread, sendThreadMessage, parseChatCommand, runChatCommand, COMMAND_HELP, CHAT_COMMANDS,
+} from '../services/chat.service.js';
 import { emitToUser } from '../sockets/index.js';
 import { notify } from '../services/notification.service.js';
 import { logDbEvent } from '../services/eventlog.service.js';
@@ -95,10 +97,28 @@ router.post('/conversations/:id', requireAuth, async (req, res, next) => {
     if (!body) return res.status(400).json({ message: 'Message body is required' });
 
     const conversation = await Conversation.findOne({ _id: req.params.id, participants: req.user._id })
-      .populate('resource', 'title');
+      .populate('resource', 'title images price ownerId availability isListed listingType receivedFrom transferCount');
     if (!conversation) return res.status(404).json({ message: 'Conversation not found' });
 
     const peerId = conversation.participants.find((p) => String(p) !== String(req.user._id));
+
+    // ---- SLASH COMMANDS: /donate · /sell 250 · /remove --------------------
+    // Typing the command in the chat window IS the action: the listing is
+    // handed over (or pulled off the marketplace) instead of a plain bubble.
+    const slash = parseChatCommand(body);
+    if (slash) {
+      const result = await runChatCommand({
+        conversation, me: req.user, peerId, command: slash.command, price: slash.price,
+      });
+      return res.status(201).json({
+        command: slash.command,
+        summary: result.summary,
+        outcome: result.outcome,
+        message: result.message,
+        conversation: { _id: conversation._id, lastMessageAt: conversation.lastMessageAt },
+      });
+    }
+
     const message = await Message.create({
       conversation: conversation._id,
       sender: req.user._id,
@@ -137,6 +157,45 @@ router.post('/conversations/:id', requireAuth, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// GET /api/messages/commands — the slash-command palette shown in the chat UI
+router.get('/commands', requireAuth, (req, res) => {
+  res.json({
+    commands: COMMAND_HELP,
+    usage: 'Type /donate, /sell <price> or /remove in the chat box (owner only).',
+    modes: CHAT_COMMANDS,
+  });
+});
+
+/**
+ * POST /api/messages/conversations/:id/command
+ * Same slash commands, callable from the chat header buttons:
+ *   { command: 'donate' | 'sell' | 'remove', price?: number }
+ */
+router.post('/conversations/:id/command', requireAuth, async (req, res, next) => {
+  try {
+    const command = String(req.body?.command || '').replace(/^\//, '').toLowerCase();
+    if (!CHAT_COMMANDS.includes(command)) {
+      return res.status(400).json({ message: `Unknown command — use ${CHAT_COMMANDS.map((c) => `/${c}`).join(', ')}` });
+    }
+    const conversation = await Conversation.findOne({ _id: req.params.id, participants: req.user._id })
+      .populate('resource', 'title images price ownerId availability isListed listingType receivedFrom transferCount');
+    if (!conversation) return res.status(404).json({ message: 'Conversation not found' });
+
+    const peerId = conversation.participants.find((p) => String(p) !== String(req.user._id));
+    const price = req.body?.price === undefined || req.body?.price === null || req.body?.price === ''
+      ? null
+      : Number(req.body.price);
+    const result = await runChatCommand({ conversation, me: req.user, peerId, command, price });
+    res.status(201).json({
+      command,
+      summary: result.summary,
+      outcome: result.outcome,
+      message: result.message,
+      conversation: { _id: conversation._id, lastMessageAt: conversation.lastMessageAt },
+    });
+  } catch (err) { next(err); }
+});
+
 // POST /api/messages/quick — start a thread from a listing page
 router.post('/quick', requireAuth, async (req, res, next) => {
   try {
@@ -148,17 +207,15 @@ router.post('/quick', requireAuth, async (req, res, next) => {
       return res.status(400).json({ message: 'You own this listing' });
     }
 
-    const pairKey = pairKeyOf(req.user._id, resource.ownerId._id);
-    let conversation = await Conversation.findOne({ pairKey });
-    if (!conversation) {
-      conversation = await Conversation.create({
-        participants: [req.user._id, resource.ownerId._id],
-        pairKey,
-        resource: resource._id,
-        subject: resource.title,
-        unread: {},
-      });
-    }
+    // Reuse the single 1:1 thread AND re-anchor it to the listing being asked
+    // about (openThread refreshes resource/subject), so chat slash commands like
+    // /donate always know which item they act on.
+    const conversation = await openThread({
+      meId: req.user._id,
+      peerId: resource.ownerId._id,
+      resourceId: resource._id,
+      subject: resource.title,
+    });
 
     const text = String(body || '').trim() || `Hi! Is "${resource.title}" still available?`;
     const message = await Message.create({

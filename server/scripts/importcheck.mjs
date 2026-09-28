@@ -12,10 +12,13 @@ const mods = [
   B + 'middleware/auth.js', B + 'middleware/error.js', B + 'middleware/upload.js',
   B + 'services/eventlog.service.js', B + 'services/notification.service.js',
   B + 'services/history.service.js', B + 'services/graph.service.js', B + 'services/graph.queries.js',
+  B + 'services/graph.seed.js', B + 'services/transfer.service.js', B + 'services/chat.service.js',
+  B + 'services/pg/temporal.service.js', B + 'services/pg/sync.service.js', B + 'services/pg/spatial.service.js',
   B + 'services/active/engine.js', B + 'services/active/changeStreams.js', B + 'services/active/cron.js',
   B + 'routes/auth.routes.js', B + 'routes/users.routes.js', B + 'routes/resource.routes.js',
   B + 'routes/material.routes.js', B + 'routes/transaction.routes.js', B + 'routes/request.routes.js',
   B + 'routes/review.routes.js', B + 'routes/report.routes.js', B + 'routes/notification.routes.js',
+  B + 'routes/message.routes.js', B + 'routes/temporal.routes.js', B + 'routes/active.routes.js',
   B + 'routes/graph.routes.js', B + 'routes/spatial.routes.js', B + 'routes/admin.routes.js', B + 'routes/system.routes.js',
 ];
 

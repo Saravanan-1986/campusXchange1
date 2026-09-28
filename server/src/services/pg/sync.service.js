@@ -44,8 +44,8 @@ export function upsertResourceMirror(resource, ownerName = '') {
     await query(
       `INSERT INTO resource_mirror (
          resource_id, title, category, subject, department, semester, condition,
-         listing_type, price, availability, status, owner_id, owner_label, rating_avg, rating_count
-       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14)
+         listing_type, price, availability, status, owner_id, owner_label, rating_avg, rating_count, is_listed
+       ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$12,$13,$14,$15)
        ON CONFLICT (resource_id) DO UPDATE SET
          title        = EXCLUDED.title,
          category     = EXCLUDED.category,
@@ -61,6 +61,7 @@ export function upsertResourceMirror(resource, ownerName = '') {
          owner_label  = EXCLUDED.owner_label,
          rating_avg   = EXCLUDED.rating_avg,
          rating_count = EXCLUDED.rating_count,
+         is_listed    = EXCLUDED.is_listed,
          updated_at   = now()`,
       [
         String(resource._id),
@@ -77,6 +78,7 @@ export function upsertResourceMirror(resource, ownerName = '') {
         ownerName || resource.ownerId?.name || '',
         num(resource.ratingAvg) ?? 0,
         Number(resource.ratingCount || 0),
+        resource.isListed !== false,
       ],
       'upsertResourceMirror'
     );

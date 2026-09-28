@@ -5,6 +5,7 @@ import { useAuth } from '../store/auth.js';
 import { GlassCard, SectionTitle, Badge } from '../components/ui/primitives.jsx';
 import { Input, Select, GradientButton } from '../components/ui/inputs.jsx';
 import { useUI } from '../store/ui.js';
+import { DEPARTMENTS, isOtherDepartment, resolveDepartment } from '../lib/departments.js';
 
 /** Profile — edit fields + location pin (spatial paradigm: 2dsphere user index). */
 export default function Profile() {
@@ -12,7 +13,7 @@ export default function Profile() {
   const pushToast = useUI((s) => s.pushToast);
   const [form, setForm] = useState({
     name: user.name, department: user.department || 'Computer Science',
-    semester: user.semester, gradYear: user.gradYear || '', bio: user.bio || '',
+    customDepartment: '', semester: user.semester, gradYear: user.gradYear || '', bio: user.bio || '',
   });
   const [locLabel, setLocLabel] = useState(user.location?.label || '');
 
@@ -56,14 +57,21 @@ export default function Profile() {
           </div>
         </div>
 
-        <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); save.mutate(form); }}>
+        <form className="space-y-4" onSubmit={(e) => {
+          e.preventDefault();
+          const { customDepartment: _omit, ...rest } = form;
+          save.mutate({ ...rest, department: resolveDepartment(form.department, form.customDepartment) });
+        }}>
           <Input label="Full name" value={form.name} onChange={set('name')} />
           <div className="grid grid-cols-3 gap-3">
             <Select label="Department" value={form.department} onChange={set('department')}
-              options={['Computer Science', 'Electronics', 'Mechanical', 'Applied Sciences'].map((d) => ({ value: d, label: d }))} />
+              options={(DEPARTMENTS.includes(form.department) ? DEPARTMENTS : [form.department, ...DEPARTMENTS]).map((d) => ({ value: d, label: d }))} />
             <Input label="Semester" type="number" min="1" max="10" value={form.semester} onChange={set('semester')} />
             <Input label="Grad year" value={form.gradYear} onChange={set('gradYear')} />
           </div>
+          {isOtherDepartment(form.department) && (
+            <Input label="Your department" value={form.customDepartment} onChange={set('customDepartment')} placeholder="e.g. Food Technology" />
+          )}
           <Input label="Bio" value={form.bio} onChange={set('bio')} placeholder="Tell campus what you trade…" />
 
           <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">

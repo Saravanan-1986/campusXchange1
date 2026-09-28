@@ -5,12 +5,13 @@ import { GlassCard, Badge } from '../ui/primitives.jsx';
 import { Input, Select, Textarea, GradientButton } from '../ui/inputs.jsx';
 import DbTechBadge from '../common/DbTechBadge.jsx';
 import { useUI } from '../../store/ui.js';
+import { DEPARTMENTS, isOtherDepartment, resolveDepartment } from '../../lib/departments.js';
 
 const TYPES = ['notes', 'question-paper', 'lab-manual', 'project-reference', 'other'];
 
 /** Upload flow — Multer on the server stores the PDF; metadata in MongoDB. */
 export default function MaterialUpload({ onDone }) {
-  const [form, setForm] = useState({ title: '', type: 'notes', department: 'Computer Science', semester: 5, subject: '', description: '' });
+  const [form, setForm] = useState({ title: '', type: 'notes', department: 'Computer Science', customDepartment: '', semester: 5, subject: '', description: '' });
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
   const qc = useQueryClient();
@@ -20,7 +21,10 @@ export default function MaterialUpload({ onDone }) {
   const mutation = useMutation({
     mutationFn: () => {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      Object.entries({
+        ...form,
+        department: resolveDepartment(form.department, form.customDepartment),
+      }).forEach(([k, v]) => { if (k !== 'customDepartment') fd.append(k, v); });
       fd.append('file', file);
       return api.post('/materials', fd);
     },
@@ -46,10 +50,13 @@ export default function MaterialUpload({ onDone }) {
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
           <Select label="Type" value={form.type} onChange={set('type')} options={TYPES.map((t) => ({ value: t, label: t }))} />
           <Select label="Department" value={form.department} onChange={set('department')}
-            options={['Computer Science', 'Electronics', 'Mechanical', 'Applied Sciences'].map((d) => ({ value: d, label: d }))} />
+            options={DEPARTMENTS.map((d) => ({ value: d, label: d }))} />
           <Input label="Semester" type="number" min="1" max="10" value={form.semester} onChange={set('semester')} />
           <Input label="Subject" value={form.subject} onChange={set('subject')} placeholder="Database Systems" />
         </div>
+        {isOtherDepartment(form.department) && (
+          <Input label="Your department" required value={form.customDepartment} onChange={set('customDepartment')} placeholder="e.g. Food Technology" />
+        )}
         <Textarea label="Description" value={form.description} onChange={set('description')} placeholder="What does it cover?" className="min-h-[64px]" />
         <div>
           <span className="mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted">File (PDF / image, ≤10MB)</span>

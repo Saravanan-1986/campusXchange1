@@ -8,6 +8,7 @@ import DbTechBadge from '../common/DbTechBadge.jsx';
 const NAV = [
   { to: '/dashboard', label: 'Dashboard', icon: '◈' },
   { to: '/resources', label: 'Marketplace', icon: '⇄' },
+  { to: '/my-items', label: 'My items', icon: '📦' },
   { to: '/materials', label: 'Knowledge Hub', icon: '❖' },
   { to: '/near-me', label: 'Nearby items', icon: '⌖' },
   { to: '/chat', label: 'Chat', icon: '💬' },

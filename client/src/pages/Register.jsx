@@ -5,10 +5,11 @@ import { useAuth } from '../store/auth.js';
 import { GradientButton, Input, Select } from '../components/ui/inputs.jsx';
 import BackgroundMesh from '../components/common/BackgroundMesh.jsx';
 import { useUI } from '../store/ui.js';
+import { DEPARTMENTS, isOtherDepartment, resolveDepartment } from '../lib/departments.js';
 
 export default function Register() {
   const [form, setForm] = useState({
-    name: '', collegeEmail: '', password: '', department: 'Computer Science', semester: 5, gradYear: '2027',
+    name: '', collegeEmail: '', password: '', department: 'Computer Science', customDepartment: '', semester: 5, gradYear: '2027',
   });
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -23,7 +24,11 @@ export default function Register() {
     setBusy(true);
     setError('');
     try {
-      const { data } = await api.post('/auth/register', form);
+      const { customDepartment: _omit, ...rest } = form;
+      const { data } = await api.post('/auth/register', {
+        ...rest,
+        department: resolveDepartment(form.department, form.customDepartment),
+      });
       setAuth({ user: data.user, token: data.token });
       pushToast({ title: 'Account created 🎉', message: 'Check the server console for your verification link (dev mailer).', variant: 'success', duration: 8000 });
       navigate('/dashboard');
@@ -51,9 +56,12 @@ export default function Register() {
           <Input label="Password" type="password" required minLength={6} value={form.password} onChange={set('password')} placeholder="min 6 chars" />
           <div className="grid grid-cols-2 gap-3">
             <Select label="Department" value={form.department} onChange={set('department')}
-              options={['Computer Science', 'Electronics', 'Mechanical', 'Applied Sciences', 'Administration'].map((d) => ({ value: d, label: d }))} />
+              options={DEPARTMENTS.map((d) => ({ value: d, label: d }))} />
             <Input label="Semester" type="number" min="1" max="10" value={form.semester} onChange={set('semester')} />
           </div>
+          {isOtherDepartment(form.department) && (
+            <Input label="Your department" required value={form.customDepartment} onChange={set('customDepartment')} placeholder="e.g. Food Technology" />
+          )}
           <Input label="Graduation year" value={form.gradYear} onChange={set('gradYear')} placeholder="2027" />
           {error && <p className="rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-xs text-danger">{error}</p>}
           <GradientButton type="submit" disabled={busy} className="w-full">

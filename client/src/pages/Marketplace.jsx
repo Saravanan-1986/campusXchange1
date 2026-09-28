@@ -6,6 +6,7 @@ import ResourceCard from '../components/resource/ResourceCard.jsx';
 import { GlassCard, EmptyState, CardSkeletonGrid, SectionTitle, Badge } from '../components/ui/primitives.jsx';
 import { Select, Input, GradientButton } from '../components/ui/inputs.jsx';
 import DbTechBadge from '../components/common/DbTechBadge.jsx';
+import { DEPARTMENTS } from '../lib/departments.js';
 
 const CATEGORIES = ['textbook', 'calculator', 'lab-kit', 'tool', 'electronic-component', 'project-resource', 'other'];
 const CONDITIONS = ['new', 'like-new', 'good', 'fair'];
@@ -76,6 +77,10 @@ export default function Marketplace() {
           <Select value={filters.availability || ''} onChange={(e) => setF('availability', e.target.value)}>
             <option value="">Availability</option>
             {AVAILABILITY.map((c) => <option key={c} value={c}>{c}</option>)}
+          </Select>
+          <Select value={filters.department || ''} onChange={(e) => setF('department', e.target.value)}>
+            <option value="">Department</option>
+            {DEPARTMENTS.filter((d) => d !== 'Other').map((d) => <option key={d} value={d}>{d}</option>)}
           </Select>
           <Select value={filters.sort || ''} onChange={(e) => setF('sort', e.target.value)}>
             <option value="">Sort</option>

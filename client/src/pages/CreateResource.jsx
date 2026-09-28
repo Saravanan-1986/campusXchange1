@@ -5,6 +5,7 @@ import { GlassCard, SectionTitle, Badge } from '../components/ui/primitives.jsx'
 import { Input, Select, Textarea, GradientButton } from '../components/ui/inputs.jsx';
 import DbTechBadge from '../components/common/DbTechBadge.jsx';
 import { useUI } from '../store/ui.js';
+import { DEPARTMENTS, isOtherDepartment, resolveDepartment } from '../lib/departments.js';
 
 const CATEGORIES = ['textbook', 'calculator', 'lab-kit', 'tool', 'electronic-component', 'project-resource', 'other'];
 const CONDITIONS = ['new', 'like-new', 'good', 'fair'];
@@ -18,7 +19,7 @@ const LISTING_TYPES = ['sell', 'donate', 'exchange', 'lend'];
 export default function CreateResource() {
   const [form, setForm] = useState({
     title: '', description: '', category: 'textbook', subject: '', department: 'Computer Science',
-    semester: 5, condition: 'good', listingType: 'sell', price: 0, tags: '',
+    customDepartment: '', semester: 5, condition: 'good', listingType: 'sell', price: 0, tags: '',
   });
   const [files, setFiles] = useState([]);
   // Pickup spot: the seller pins their real location at listing time. The
@@ -64,7 +65,10 @@ export default function CreateResource() {
     setError('');
     try {
       const fd = new FormData();
-      Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      Object.entries({
+        ...form,
+        department: resolveDepartment(form.department, form.customDepartment),
+      }).forEach(([k, v]) => { if (k !== 'customDepartment') fd.append(k, v); });
       // Coordinates captured at listing time → stored in PG geo_resource via sync service.
       fd.append('location', JSON.stringify({ ...pin, label: customLabel || pin.label }));
       files.forEach((f) => fd.append('images', f));
@@ -93,9 +97,12 @@ export default function CreateResource() {
             <Select label="Category" value={form.category} onChange={set('category')} options={CATEGORIES.map((c) => ({ value: c, label: c }))} />
             <Input label="Subject" value={form.subject} onChange={set('subject')} placeholder="Database Systems" />
             <Select label="Department" value={form.department} onChange={set('department')}
-              options={['Computer Science', 'Electronics', 'Mechanical', 'Applied Sciences'].map((d) => ({ value: d, label: d }))} />
+              options={DEPARTMENTS.map((d) => ({ value: d, label: d }))} />
             <Input label="Semester" type="number" min="1" max="10" value={form.semester} onChange={set('semester')} />
           </div>
+          {isOtherDepartment(form.department) && (
+            <Input label="Your department" required value={form.customDepartment} onChange={set('customDepartment')} placeholder="e.g. Food Technology" />
+          )}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             <Select label="Condition" value={form.condition} onChange={set('condition')} options={CONDITIONS.map((c) => ({ value: c, label: c }))} />
             <Select label="Deal type" value={form.listingType} onChange={set('listingType')} options={LISTING_TYPES.map((c) => ({ value: c, label: c }))} />

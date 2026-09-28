@@ -23,6 +23,8 @@ const Chat = lazy(() => import('./pages/Chat.jsx'));
 const Notifications = lazy(() => import('./pages/Notifications.jsx'));
 const Profile = lazy(() => import('./pages/Profile.jsx'));
 const Admin = lazy(() => import('./pages/Admin.jsx'));
+const MyItems = lazy(() => import('./pages/MyItems.jsx'));
+const ItemsReceived = lazy(() => import('./pages/ItemsReceived.jsx'));
 const NotFound = lazy(() => import('./pages/NotFound.jsx'));
 
 function BootScreen() {
@@ -63,6 +65,8 @@ export default function App() {
           <Route path="/dashboard" element={<PageTransition><Dashboard /></PageTransition>} />
           <Route path="/resources" element={<PageTransition><Marketplace /></PageTransition>} />
           <Route path="/resources/new" element={<PageTransition><CreateResource /></PageTransition>} />
+          <Route path="/my-items" element={<PageTransition><MyItems /></PageTransition>} />
+          <Route path="/items-received" element={<PageTransition><ItemsReceived /></PageTransition>} />
           <Route path="/resources/:id" element={<PageTransition><ResourceDetail /></PageTransition>} />
           <Route path="/materials" element={<PageTransition><KnowledgeHub /></PageTransition>} />
           <Route path="/materials/new" element={<PageTransition><KnowledgeHub /></PageTransition>} />

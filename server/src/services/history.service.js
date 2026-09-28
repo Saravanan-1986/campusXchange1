@@ -24,6 +24,8 @@ function snapshotOf(resource, ownerName) {
     ownerName: maskName(ownerName),
     category: resource.category,
     subject: resource.subject || '',
+    isListed: resource.isListed !== false,
+    transferCount: Number(resource.transferCount || 0),
   };
 }
 

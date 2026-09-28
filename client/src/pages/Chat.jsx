@@ -80,6 +80,28 @@ export default function Chat() {
     onError: (err) => useUI.getState().pushToast({ title: 'Message failed', message: errMsg(err), variant: 'danger' }),
   });
 
+  const [sellPriceInput, setSellPriceInput] = useState('');
+  const [showSellPrompt, setShowSellPrompt] = useState(false);
+
+  const runCommand = useMutation({
+    mutationFn: ({ command, price }) =>
+      api.post(`/messages/conversations/${activeId}/command`, { command, price }),
+    onSuccess: (res) => {
+      setShowSellPrompt(false);
+      setSellPriceInput('');
+      useUI.getState().pushToast({
+        title: `Handover complete (${res.data.command})`,
+        message: res.data.summary,
+        variant: 'success',
+      });
+      qc.invalidateQueries({ queryKey: ['conversation', activeId] });
+      qc.invalidateQueries({ queryKey: ['conversations'] });
+      qc.invalidateQueries({ queryKey: ['resources'] });
+    },
+    onError: (err) =>
+      useUI.getState().pushToast({ title: 'Handover failed', message: errMsg(err), variant: 'danger' }),
+  });
+
   // Seller/giver removes the listing straight from this window once the item
   // is sold or given away — same owner-guarded DELETE as the marketplace page.
   const removeListing = useMutation({
@@ -207,33 +229,67 @@ export default function Chat() {
               <span className="text-sm text-ink-muted">Pick a conversation</span>
             )}
             {active?.resource?._id && (
-              <div className="ml-auto flex items-center gap-2">
+              <div className="ml-auto flex flex-wrap items-center gap-1.5">
                 <Link
                   to={`/resources/${active.resource._id}`}
-                  className="max-w-[45%] truncate rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-primary-light hover:border-accent/50"
+                  className="max-w-[160px] truncate rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-primary-light hover:border-accent/50"
                 >
                   ⇄ {active.resource.title}
                 </Link>
+
                 {canRemoveListing && (
-                  confirmRemove ? (
-                    <span className="flex shrink-0 items-center gap-1.5">
-                      <button
-                        onClick={() => removeListing.mutate(active.resource._id)}
-                        disabled={removeListing.isPending}
-                        className="rounded-lg border border-danger/40 bg-danger/15 px-2.5 py-1 text-[11px] font-semibold text-danger hover:bg-danger/25 disabled:opacity-60"
-                      >
-                        {removeListing.isPending ? 'Removing…' : 'Yes, remove'}
-                      </button>
-                      <button onClick={() => setConfirmRemove(false)} className="shrink-0 text-[11px] text-ink-muted hover:text-ink">Cancel</button>
-                    </span>
-                  ) : (
+                  <>
                     <button
-                      onClick={() => setConfirmRemove(true)}
-                      className="shrink-0 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-danger/85 hover:border-danger/40 hover:text-danger"
+                      onClick={() => runCommand.mutate({ command: 'donate' })}
+                      disabled={runCommand.isPending}
+                      title="Hand over to this user for free"
+                      className="rounded-lg border border-accent/40 bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent-light hover:bg-accent/25 disabled:opacity-50"
                     >
-                      🗑 Remove listing
+                      🎁 Donate
                     </button>
-                  )
+
+                    {showSellPrompt ? (
+                      <span className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          placeholder="₹"
+                          value={sellPriceInput}
+                          onChange={(e) => setSellPriceInput(e.target.value)}
+                          className="w-16 rounded-lg border border-white/10 bg-white/5 px-2 py-0.5 text-[11px] text-ink outline-none"
+                        />
+                        <button
+                          onClick={() => runCommand.mutate({ command: 'sell', price: Number(sellPriceInput) || 0 })}
+                          disabled={runCommand.isPending}
+                          className="rounded-lg border border-primary/40 bg-primary/20 px-2 py-0.5 text-[11px] font-semibold text-primary-light hover:bg-primary/30"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          onClick={() => setShowSellPrompt(false)}
+                          className="text-[10px] text-ink-muted hover:text-ink"
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setShowSellPrompt(true)}
+                        title="Sell to this user"
+                        className="rounded-lg border border-primary/40 bg-primary/15 px-2.5 py-1 text-[11px] font-semibold text-primary-light hover:bg-primary/25"
+                      >
+                        🏷 Sell
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => runCommand.mutate({ command: 'remove' })}
+                      disabled={runCommand.isPending}
+                      title="Take listing off the marketplace"
+                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-[11px] text-danger/80 hover:border-danger/40 hover:text-danger disabled:opacity-50"
+                    >
+                      🗑 Remove
+                    </button>
+                  </>
                 )}
               </div>
             )}
@@ -249,6 +305,19 @@ export default function Chat() {
             ) : (
               messages.map((m) => {
                 const mine = String(m.sender?._id || m.sender) === String(user?.id);
+                if (m.system) {
+                  return (
+                    <div key={m._id} className="my-2 flex justify-center">
+                      <div className="max-w-[85%] rounded-xl border border-accent/30 bg-accent/10 px-4 py-2 text-center text-xs text-ink shadow-glow-sm">
+                        <span className="font-semibold text-accent-light">System: </span>
+                        <span>{m.body}</span>
+                        <div className="mt-0.5 text-[10px] text-ink-muted">
+                          {new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
                 return (
                   <div key={m._id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                     <div

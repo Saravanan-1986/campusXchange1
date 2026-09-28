@@ -12,7 +12,7 @@ const n = (v) => (v === null || v === undefined ? null : Number(v));
 function numRow(r) {
   if (!r) return r;
   const out = { ...r };
-  for (const k of ['price', 'delta', 'pct_change', 'held_days', 'span_days',
+  for (const k of ['price', 'delta', 'pct_change', 'held_days', 'span_days', 'total_days',
     'avg_versions_per_item', 'total_borrow_days', 'days_overdue']) {
     if (k in out) out[k] = n(out[k]);
   }
@@ -377,6 +377,54 @@ export async function backdateVersion(resourceId, {
   }
 }
 
+
+// ============================================================================
+// CUSTODY / HANDOVER chain (migration 006) — "who owned this product before me?"
+// ============================================================================
+
+/**
+ * The full chain of previous users of one item, straight from the
+ * custody_period valid-time periods (cx_custody_chain).
+ */
+export async function getCustodyChain(resourceId) {
+  const data = await rows(`SELECT * FROM cx_custody_chain($1)`, [String(resourceId)], 'custody-chain');
+  return data.map(numRow);
+}
+
+/** Handover counters + overlap/gap proof for the EXCLUDE constraint. */
+export async function getCustodyIntegrity(resourceId = null) {
+  const data = await rows(`SELECT * FROM cx_custody_integrity($1)`, [resourceId], 'custody-integrity');
+  return data.map(numRow);
+}
+
+/** Recent handovers across campus (optionally only the ones you are part of). */
+export async function getRecentHandovers(limit = 25, userId = null) {
+  const data = await rows(
+    `SELECT * FROM cx_recent_handovers($1, $2)`,
+    [Number(limit) || 25, userId ? String(userId) : null],
+    'recent-handovers'
+  );
+  return data.map(numRow);
+}
+
+/**
+ * Annotate the currently open custody period — the app knows whether the
+ * handover came from a chat /donate, /sell or a plain "remove from market".
+ */
+export async function tagCustody(resourceId, kind = null, note = '') {
+  // The table's CHECK constraint uses past-tense kinds; app callers say "donate".
+  const alias = { donate: 'donated', sell: 'sold', receive: 'received', relist: 'relisted', unlist: 'unlisted' };
+  const allowed = ['listed', 'sold', 'donated', 'received', 'relisted', 'unlisted'];
+  const safeKind = kind ? (alias[kind] || kind) : null;
+  try {
+    const r = await row(`SELECT cx_tag_custody($1, $2, $3) AS custody_id`,
+      [String(resourceId), allowed.includes(safeKind) ? safeKind : null, note], 'tag-custody');
+    return r?.custody_id != null ? Number(r.custody_id) : null;
+  } catch (err) {
+    console.warn('[temporal] tagCustody notice:', err.message);
+    return null;
+  }
+}
 
 export { rows, row, query };
 
